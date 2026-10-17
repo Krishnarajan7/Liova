@@ -55,9 +55,25 @@ Plug in and a little battery fills up, a bolt pops in and a streak of light runs
 <td valign="top">
 
 **🔊 A better volume and brightness HUD**<br>
-A slim level bar at the edge of the screen that runs green to red as it gets louder. Or keep it in the notch. Opt-in, and it can never break the system HUD.
+Slim level bars at the edges of the screen: volume on the right, running green to red as it gets louder, and brightness on the left. Or keep them in the notch. Opt-in, and they can never break the system HUD.
 
 <img src="docs/assets/side-hud.png" width="96" alt="Vertical volume bar">
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**📊 System at a glance**<br>
+Live CPU, memory and GPU with a minute of history, one tap away in the open notch. It measures only while you're looking.
+
+<img src="docs/assets/system.png" alt="CPU, memory and GPU graphs in the notch">
+
+</td>
+<td valign="top">
+
+**⬇️ Downloads**<br>
+Browser and Telegram downloads show up with size, speed and time left, then flash when they're done. Liova only looks at file names and sizes, never their contents.
 
 </td>
 </tr>
@@ -147,6 +163,7 @@ Read more in [ARCHITECTURE.md](docs/ARCHITECTURE.md) and the [decision log](docs
 - [x] Activity engine, battery, Now Playing, volume and brightness HUDs
 - [x] Plugin API: CLI, socket and `liova://` links
 - [x] Agent Island for Claude Code
+- [x] Downloads, System page, open-notch pages with battery status
 - [ ] File shelf with AirDrop
 - [ ] Agent Island for Codex, Cursor and Gemini CLI
 - [ ] Timers, calendar, Focus, AirPods and more live activities

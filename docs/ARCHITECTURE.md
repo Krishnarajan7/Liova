@@ -103,6 +103,14 @@ First-party features use the same models from `LiovaPluginKit` as third parties,
 
 The notch renders every activity the same way by default: a symbol, a title and optional progress. A feature that needs more (Now Playing's artwork, scrubber and controls) registers an `ActivityRenderer` for its source in the `ActivityRendererRegistry`. The renderer supplies the compact left and right "ears" and the expanded card; anything it returns `nil` for falls back to the defaults. The notch itself never knows about media, so features stay out of `LiovaUI` and the same hook can later serve native plugins.
 
+### Open-notch chrome and pages
+
+The open notch has a header row beside the camera: page icons on the left (Home plus any registered pages, with a highlight that slides between them), and on the right either a brief event chip or a status view (battery level, green with a bolt while charging) and a Settings button. `NotchChrome` holds these: features contribute pages (`NotchChrome.Page`) and status views without `LiovaUI` knowing what they are. The System page (`SystemMonitorFeature`) samples CPU, memory and GPU load once a second, and only while a System page is on screen.
+
+### Downloads
+
+Two event-driven sources feed `DownloadsFeature`: published file progress (`Progress.addSubscriber(forFileURL:)` on `~/Downloads`, used by Safari and others) and growing partial files seen through FSEvents (`.crdownload`, `.part`, Telegram's `_partial` media files). Only names and sizes are read, never contents. A 1 Hz sampler runs only while a download is active. Folder discovery runs off the main thread, because listing another app's container (Telegram, opt-in) can wait on a macOS privacy prompt. Details: [DOWNLOADS.md](DOWNLOADS.md).
+
 ### Now Playing
 
 `MediaRemoteAdapterProvider` runs the vendored [mediaremote-adapter](../Vendor/mediaremote-adapter/VENDORED.md) under `/usr/bin/perl` in `stream` mode: a push-based child process that writes one JSON line per change. Lines are parsed off the main thread (artwork arrives as large base64 strings) and delivered in order; the helper is restarted with backoff if it dies. `NowPlayingFeature` decodes artwork once, downsampled with ImageIO, and publishes a low-priority `system.media` activity, so any other activity preempts the music and the music comes back when it ends. Paused media leaves after 10 minutes.
@@ -152,7 +160,7 @@ flowchart LR
 | `LiovaCore` | `ActivityEngine`, `ActivityCommandExecutor`, `NotchGeometry`, `DisplayManager`, `LiovaSettings`, `Log` |
 | `LiovaUI` | `NotchShape`, `NotchLayout`, `NotchInteraction`, `NotchController`, `NotchSystem`, `PointerMonitor`, `ActivityRendererRegistry`, `Motion`, views |
 | `LiovaProviders` | `PowerSourceProviding` + `IOKitPowerSource`; `NowPlayingProviding` + `MediaRemoteAdapterProvider`; HUD providers (volume, brightness, media-key tap) |
-| `LiovaFeatures` | `BatteryFeature`, `NowPlayingFeature` + `NowPlayingRenderer`, `HUDFeature`, each with a pure, tested policy |
+| `LiovaFeatures` | `BatteryFeature`, `NowPlayingFeature`, `HUDFeature`, `AgentIslandFeature`, `DownloadsFeature`, `SystemMonitorFeature`, each with a pure, tested policy and its own renderer or page |
 | `LiovaIPC` | Socket server and client, `liova://` URL parser |
 | `liova` | The command-line tool |
 

@@ -46,6 +46,7 @@ struct SnapshotExport {
     }
 
     let renderers = ActivityRendererRegistry()
+    let chrome = NotchChrome()
 
     private func render(_ name: String, _ presentation: NotchPresentation, _ activities: [Activity]) throws {
         let engine = ActivityEngine()
@@ -62,7 +63,7 @@ struct SnapshotExport {
                 Color(white: 0.85).frame(height: geometry.notchSize.height)
                 Color(white: 0.95)
             }
-            NotchRootView(model: model, engine: engine, renderers: renderers, onTap: {})
+            NotchRootView(model: model, engine: engine, renderers: renderers, chrome: chrome, onTap: {})
         }
         .frame(width: size.width, height: size.height)
 

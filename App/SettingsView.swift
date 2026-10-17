@@ -85,6 +85,17 @@ private struct ActivitySettings: View {
                 }
             }
             Section {
+                Toggle("Downloads", isOn: $settings.downloadsEnabled)
+                Toggle("Include Telegram downloads", isOn: $settings.telegramDownloadsEnabled)
+                    .disabled(!settings.downloadsEnabled)
+            } footer: {
+                Text(
+                    "Shows downloads from your browsers (and Telegram, if you turn it on) with progress "
+                        + "and speed. Liova only looks at file names and sizes, never their contents. "
+                        + "For Telegram, macOS asks once whether Liova may see another app's data."
+                )
+            }
+            Section {
                 Toggle("Battery and charging", isOn: $settings.batteryActivitiesEnabled)
                 Stepper(value: $settings.lowBatteryThreshold, in: 5 ... 50, step: 5) {
                     LabeledContent("Low battery warning", value: "\(settings.lowBatteryThreshold)%")

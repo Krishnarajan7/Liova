@@ -11,6 +11,7 @@ public final class NotchSystem {
     private let settings: LiovaSettings
     private let displayManager: DisplayManager
     private let renderers: ActivityRendererRegistry
+    private let chrome: NotchChrome
     private let pointer = PointerMonitor()
     private var controllers: [String: NotchController] = [:]
 
@@ -18,10 +19,12 @@ public final class NotchSystem {
         engine: ActivityEngine,
         settings: LiovaSettings,
         displayManager: DisplayManager,
-        renderers: ActivityRendererRegistry
+        renderers: ActivityRendererRegistry,
+        chrome: NotchChrome
     ) {
         self.engine = engine
         self.renderers = renderers
+        self.chrome = chrome
         self.settings = settings
         self.displayManager = displayManager
     }
@@ -77,7 +80,8 @@ public final class NotchSystem {
                     display: display,
                     engine: engine,
                     settings: settings,
-                    renderers: renderers
+                    renderers: renderers,
+                    chrome: chrome
                 )
                 controllers[display.id] = controller
                 controller.show()

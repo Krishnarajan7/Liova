@@ -67,6 +67,11 @@ Also done ahead of schedule:
 - [x] Agent Island (app side): sessions in the notch, Allow / Deny prompts that open the notch, safe fallbacks to the agent's own prompt
 - [x] Agent Island (CLI side): `liova hook claude-code` (~17 ms per event, prompt text never sent) and `liova agents install|uninstall|status claude-code`
 - [x] Delight pass: charging moment (battery fill, bolt, light sweep), stepped music meter, side-bar HUD with level-meter colors, brief events as a chip so the open notch keeps your music
+- [x] Open notch with pages (Home, System) and a header with battery status and Settings
+- [x] System page: live CPU, memory and GPU graphs (sampled only while visible)
+- [x] Unplug animation (bolt flies off, fill cools, light sweeps back)
+- [x] Downloads: browsers and Telegram, with size, speed and time left; metadata only
+- [x] Side-bar HUDs: volume on the right (green to red), brightness on the left
 - [x] Settings window (launch at login, display placement, hover, haptics, battery) and a demo activity in the menu
 - [x] Measured on a Release build: 0.0% CPU idle, 0.17% with music playing, under 25 MB memory
 

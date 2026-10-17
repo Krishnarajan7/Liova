@@ -5,8 +5,9 @@ import SwiftUI
 /// The charging moment.
 ///
 /// Plugging in: a battery fills up to the current charge with a spring, a bolt pops in,
-/// and a streak of light sweeps once along the notch. Unplugging: the battery settles
-/// grey. Full: one soft green glow. Low: red. Every effect is one-shot, so the closed notch
+/// and a streak of green light sweeps left to right along the notch. Unplugging: the bolt
+/// flies off, the fill cools from green to white and a faint light sweeps back right to
+/// left. Full: one soft green glow. Low: red. Every effect is one-shot, so the closed notch
 /// still never loops an animation.
 @MainActor
 public final class BatteryRenderer: ActivityRenderer {
@@ -28,10 +29,10 @@ public final class BatteryRenderer: ActivityRenderer {
 
     public func compactBackground(for activity: Activity) -> AnyView? {
         switch Style(activity) {
-        case .charging: AnyView(EnergySweep(color: .green))
+        case .charging: AnyView(EnergySweep(color: .green, reversed: false))
         case .full: AnyView(SoftGlow(color: .green))
         case .low: AnyView(SoftGlow(color: .red))
-        case .onBattery: nil
+        case .onBattery: AnyView(EnergySweep(color: .white.opacity(0.7), reversed: true))
         }
     }
 
@@ -63,6 +64,8 @@ private struct BatteryGlyph: View {
     let level: Double
     @State private var shownLevel = 0.0
     @State private var boltVisible = false
+    /// Unplugging starts "still charging" (green, bolt) and cools down.
+    @State private var unplugged = false
 
     var body: some View {
         HStack(spacing: 1) {
@@ -70,16 +73,17 @@ private struct BatteryGlyph: View {
                 RoundedRectangle(cornerRadius: 3.5, style: .continuous)
                     .strokeBorder(.white.opacity(0.45), lineWidth: 1.2)
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(style.color)
+                    .fill(style == .onBattery && !unplugged ? Color.green : style.color)
                     .frame(width: max(2, 19 * shownLevel))
                     .padding(2)
-                if style == .charging || style == .full {
+                if style == .charging || style == .full || style == .onBattery {
                     Image(systemName: "bolt.fill")
                         .font(.system(size: 8, weight: .black))
                         .foregroundStyle(.white)
                         .shadow(color: .black.opacity(0.6), radius: 1)
                         .frame(maxWidth: .infinity)
-                        .scaleEffect(boltVisible ? 1 : 0.2)
+                        .scaleEffect(boltVisible ? 1 : (style == .onBattery ? 1.4 : 0.2))
+                        .offset(y: boltVisible || style != .onBattery ? 0 : -9)
                         .opacity(boltVisible ? 1 : 0)
                 }
             }
@@ -89,6 +93,18 @@ private struct BatteryGlyph: View {
                 .frame(width: 1.5, height: 4.5)
         }
         .onAppear {
+            if style == .onBattery {
+                // The bolt starts in place, then flies up and away as the fill cools.
+                shownLevel = level
+                boltVisible = true
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.7).delay(0.25)) {
+                    boltVisible = false
+                }
+                withAnimation(.easeInOut(duration: 0.8).delay(0.3)) {
+                    unplugged = true
+                }
+                return
+            }
             // Plugging in fills from empty; other states start where they are.
             shownLevel = style == .charging ? 0 : level
             withAnimation(.spring(response: 0.9, dampingFraction: 0.85).delay(0.15)) {
@@ -104,9 +120,11 @@ private struct BatteryGlyph: View {
     }
 }
 
-/// One streak of light sweeping left to right along the notch.
+/// One streak of light sweeping along the notch: left to right when power arrives,
+/// right to left when it leaves.
 private struct EnergySweep: View {
     let color: Color
+    let reversed: Bool
     @State private var progress = -0.3
 
     var body: some View {
@@ -116,7 +134,7 @@ private struct EnergySweep: View {
                 startPoint: .leading, endPoint: .trailing
             )
             .frame(width: proxy.size.width * 0.35)
-            .offset(x: proxy.size.width * progress)
+            .offset(x: proxy.size.width * (reversed ? 0.75 - progress : progress))
             .blendMode(.plusLighter)
         }
         .allowsHitTesting(false)

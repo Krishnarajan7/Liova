@@ -22,6 +22,7 @@ struct FeatureSnapshotExport {
     ))
     let engine = ActivityEngine()
     let renderers = ActivityRendererRegistry()
+    let chrome = NotchChrome()
     let settings: LiovaSettings
 
     init() throws {
@@ -88,7 +89,7 @@ struct FeatureSnapshotExport {
             ("sidehud-2-volume-low", SideHUDState(kind: .volume, level: 0.25, symbol: "speaker.wave.1.fill")),
             ("sidehud-3-brightness", SideHUDState(kind: .brightness, level: 0.6, symbol: "sun.max.fill")),
         ] {
-            let model = SideHUDModel()
+            let model = SideHUDModel(edge: state.kind == .brightness ? .leading : .trailing)
             model.state = state
             model.isVisible = true
             let view = ZStack {
@@ -102,6 +103,41 @@ struct FeatureSnapshotExport {
             let png = try #require(NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]))
             try png.write(to: directory.appendingPathComponent("\(name).png"))
         }
+    }
+
+    @Test func notchPages() throws {
+        let power = FakePowerSource(PowerSnapshot(
+            hasBattery: true,
+            percentage: 66,
+            isPluggedIn: true,
+            isCharging: true
+        ))
+        let battery = BatteryFeature(engine: engine, settings: settings, provider: power)
+        battery.start()
+        let monitor = SystemMonitorFeature()
+        for index in 0 ..< 60 {
+            let time = Double(index)
+            monitor.append(SystemSample(
+                cpu: 0.12 + 0.08 * sin(time / 4) + (index % 7 == 0 ? 0.15 : 0),
+                memory: 0.62 + 0.02 * sin(time / 9),
+                gpu: 0.4 + 0.25 * sin(time / 6)
+            ))
+        }
+        chrome.addPage(NotchChrome.Page(id: "system", symbol: "gauge.with.dots.needle.67percent", title: "System") {
+            AnyView(SystemPage(feature: monitor))
+        })
+        chrome.trailingStatus = { AnyView(BatteryStatusView(feature: battery)) }
+        chrome.openSettings = {}
+        let provider = FakeNowPlaying()
+        let media = NowPlayingFeature(engine: engine, settings: settings, provider: provider)
+        renderers.register(NowPlayingRenderer(feature: media), forSource: NowPlayingPolicy.source)
+        media.start()
+        provider.emit(NowPlayingInfo(
+            bundleIdentifier: "com.spotify.client", title: "Golden Hour", artist: "The Midnight Owls",
+            duration: 240, elapsedTime: 83, timestamp: Date(), isPlaying: true
+        ))
+        try render("chrome-1-home", .expanded)
+        try render("chrome-2-system", .expanded, page: "system")
     }
 
     @Test func agentIsland() async throws {
@@ -127,16 +163,19 @@ struct FeatureSnapshotExport {
         _ = await request.value
     }
 
-    private func render(_ name: String, _ presentation: NotchPresentation) throws {
+    private func render(_ name: String, _ presentation: NotchPresentation, page: String? = nil) throws {
         let model = NotchModel(geometry: geometry, showsIdleVirtualNotch: true)
         model.presentation = presentation
+        if let page {
+            model.selectedPage = page
+        }
         let size = NotchLayout.panelSize(for: geometry)
         let view = ZStack(alignment: .top) {
             VStack(spacing: 0) {
                 Color(white: 0.85).frame(height: geometry.notchSize.height)
                 Color(white: 0.95)
             }
-            NotchRootView(model: model, engine: engine, renderers: renderers, onTap: {})
+            NotchRootView(model: model, engine: engine, renderers: renderers, chrome: chrome, onTap: {})
         }
         .frame(width: size.width, height: size.height)
         let renderer = ImageRenderer(content: view)

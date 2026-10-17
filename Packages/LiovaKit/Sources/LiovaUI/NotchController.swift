@@ -28,7 +28,8 @@ public final class NotchController {
         display: Display,
         engine: ActivityEngine,
         settings: LiovaSettings,
-        renderers: ActivityRendererRegistry
+        renderers: ActivityRendererRegistry,
+        chrome: NotchChrome
     ) {
         self.display = display
         self.engine = engine
@@ -36,7 +37,7 @@ public final class NotchController {
         model = NotchModel(geometry: display.geometry, showsIdleVirtualNotch: settings.showVirtualNotchWhenIdle)
         panel = NotchPanel(frame: Self.panelFrame(for: display.geometry))
 
-        let root = NotchRootView(model: model, engine: engine, renderers: renderers) { [weak self] in
+        let root = NotchRootView(model: model, engine: engine, renderers: renderers, chrome: chrome) { [weak self] in
             self?.handle(.clicked)
         }
         panel.contentView = NotchHostingView(rootView: root)
@@ -70,6 +71,9 @@ public final class NotchController {
 
     /// Opens (or, with `false`, closes again) for something that needs the user.
     public func setAttention(_ needed: Bool) {
+        if needed {
+            model.selectedPage = NotchChrome.homePageID
+        }
         handle(needed ? .attentionRequested : .attentionCleared)
     }
 

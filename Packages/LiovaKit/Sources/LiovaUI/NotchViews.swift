@@ -7,6 +7,7 @@ struct NotchRootView: View {
     let model: NotchModel
     let engine: ActivityEngine
     let renderers: ActivityRendererRegistry
+    let chrome: NotchChrome
     let onTap: () -> Void
 
     var body: some View {
@@ -36,7 +37,7 @@ struct NotchRootView: View {
     private func content(spec: NotchSpec) -> some View {
         switch model.presentation {
         case .expanded:
-            ExpandedView(engine: engine, renderers: renderers, cameraHeight: model.geometry.notchSize.height)
+            ExpandedView(model: model, engine: engine, renderers: renderers, chrome: chrome)
                 .transition(.asymmetric(
                     insertion: .opacity.combined(with: .scale(scale: 0.96, anchor: .top))
                         .animation(Motion.expandedContentIn),

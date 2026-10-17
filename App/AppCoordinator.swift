@@ -6,6 +6,7 @@ import LiovaPluginKit
 import LiovaProviders
 import LiovaUI
 import Observation
+import SwiftUI
 
 /// Builds and owns every long-lived object. The only place where modules meet.
 @MainActor
@@ -17,15 +18,19 @@ final class AppCoordinator {
 
     @ObservationIgnored private let displayManager = DisplayManager()
     @ObservationIgnored private let renderers = ActivityRendererRegistry()
+    @ObservationIgnored private let chrome = NotchChrome()
+    @ObservationIgnored private let systemMonitor = SystemMonitorFeature()
     @ObservationIgnored private lazy var notchSystem = NotchSystem(
         engine: engine,
         settings: settings,
         displayManager: displayManager,
-        renderers: renderers
+        renderers: renderers,
+        chrome: chrome
     )
     /// Created at launch: it checks for safe mode (Option held) only once, in `init`.
     let hud: HUDFeature
     let agents: AgentIslandFeature
+    let downloads: DownloadsFeature
     /// Nil provider when the adapter isn't bundled (e.g. a build without `make vendor`).
     @ObservationIgnored private(set) lazy var nowPlaying = NowPlayingFeature(
         engine: engine,
@@ -43,11 +48,14 @@ final class AppCoordinator {
     @ObservationIgnored private var demoTask: Task<Void, Never>?
 
     @ObservationIgnored private var accessibilityObserver: (any NSObjectProtocol)?
-    @ObservationIgnored private let sideHUD = SideHUDController()
+    /// Volume on the right edge, brightness on the left.
+    @ObservationIgnored private let volumeBar = SideHUDController(edge: .trailing)
+    @ObservationIgnored private let brightnessBar = SideHUDController(edge: .leading)
 
     init() {
         hud = HUDFeature(engine: engine, settings: settings)
         agents = AgentIslandFeature(engine: engine, settings: settings)
+        downloads = DownloadsFeature(engine: engine, settings: settings)
     }
 
     func start() {
@@ -55,16 +63,21 @@ final class AppCoordinator {
         renderers.register(NowPlayingRenderer(feature: nowPlaying), forSource: NowPlayingPolicy.source)
         renderers.register(HUDRenderer(), forSource: HUDPolicy.source)
         renderers.register(BatteryRenderer(), forSource: BatteryActivityPolicy.source)
-        hud.sideHUD = { [sideHUD] state in sideHUD.show(state) }
+        renderers.register(DownloadsRenderer(feature: downloads), forSource: DownloadsPolicy.source)
+        hud.sideHUD = { [volumeBar, brightnessBar] state in
+            (state.kind == .brightness ? brightnessBar : volumeBar).show(state)
+        }
         renderers.register(AgentIslandRenderer(feature: agents), forSource: AgentIslandPolicy.source)
         agents.onAttentionChange = { [weak self] needed in
             self?.notchSystem.setAttention(needed)
         }
         observeAccessibilityChanges()
+        configureChrome()
         notchSystem.start()
         battery.syncWithSettings()
         nowPlaying.syncWithSettings()
         hud.syncWithSettings()
+        downloads.syncWithSettings()
         startPluginServer()
         settingsObservation = ObservationLoop { [weak self] in
             guard let self else { return }
@@ -76,7 +89,9 @@ final class AppCoordinator {
                 settings.lowBatteryThreshold,
                 settings.nowPlayingEnabled,
                 settings.hudReplacementEnabled,
-                settings.agentIslandEnabled
+                settings.agentIslandEnabled,
+                settings.downloadsEnabled,
+                settings.telegramDownloadsEnabled
             )
         } onChange: { [weak self] in
             self?.notchSystem.settingsDidChange()
@@ -84,6 +99,7 @@ final class AppCoordinator {
             self?.nowPlaying.syncWithSettings()
             self?.hud.syncWithSettings()
             self?.agents.syncWithSettings()
+            self?.downloads.syncWithSettings()
         }
         Log.signposter.endInterval("launch", interval)
         Log.app.info("Liova started")
@@ -101,6 +117,7 @@ final class AppCoordinator {
         nowPlaying.stop()
         hud.stop()
         agents.stop()
+        downloads.stop()
         notchSystem.stop()
     }
 
@@ -114,6 +131,20 @@ final class AppCoordinator {
             }
         } catch {
             Log.app.notice("Invalid link: \(error.message, privacy: .public)")
+        }
+    }
+
+    /// Pages and status for the open notch.
+    private func configureChrome() {
+        let systemMonitor = systemMonitor
+        chrome.addPage(NotchChrome.Page(id: "system", symbol: "gauge.with.dots.needle.67percent", title: "System") {
+            AnyView(SystemPage(feature: systemMonitor))
+        })
+        let battery = battery
+        chrome.trailingStatus = { AnyView(BatteryStatusView(feature: battery)) }
+        chrome.openSettings = {
+            NSApp.activate()
+            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
         }
     }
 

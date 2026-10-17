@@ -45,6 +45,17 @@ public final class LiovaSettings {
         didSet { store(hudReplacementEnabled, .hudReplacementEnabled) }
     }
 
+    /// Show active downloads (browsers, Telegram, …) in the notch.
+    public var downloadsEnabled: Bool {
+        didSet { store(downloadsEnabled, .downloadsEnabled) }
+    }
+
+    /// Also watch Telegram for macOS' downloads. Off by default: reading the folder names in
+    /// another app's container makes macOS ask for permission.
+    public var telegramDownloadsEnabled: Bool {
+        didSet { store(telegramDownloadsEnabled, .telegramDownloadsEnabled) }
+    }
+
     /// Animate the music bars in the closed notch while something plays.
     public var animatedMusicBars: Bool {
         didSet { store(animatedMusicBars, .animatedMusicBars) }
@@ -94,6 +105,8 @@ public final class LiovaSettings {
         showVirtualNotchWhenIdle = defaults.object(forKey: Key.showVirtualNotchWhenIdle.rawValue) as? Bool ?? true
         batteryActivitiesEnabled = defaults.object(forKey: Key.batteryActivitiesEnabled.rawValue) as? Bool ?? true
         hudReplacementEnabled = defaults.object(forKey: Key.hudReplacementEnabled.rawValue) as? Bool ?? false
+        downloadsEnabled = defaults.object(forKey: Key.downloadsEnabled.rawValue) as? Bool ?? true
+        telegramDownloadsEnabled = defaults.object(forKey: Key.telegramDownloadsEnabled.rawValue) as? Bool ?? false
         animatedMusicBars = defaults.object(forKey: Key.animatedMusicBars.rawValue) as? Bool ?? true
         hudStyle = defaults.string(forKey: Key.hudStyle.rawValue).flatMap(HUDStyle.init(rawValue:)) ?? .sideBar
         nowPlayingEnabled = defaults.object(forKey: Key.nowPlayingEnabled.rawValue) as? Bool ?? true
@@ -115,6 +128,8 @@ public final class LiovaSettings {
         case nowPlayingEnabled
         case hudStyle
         case animatedMusicBars
+        case downloadsEnabled
+        case telegramDownloadsEnabled
         case agentIslandEnabled
         case agentOpensNotchForApprovals
     }

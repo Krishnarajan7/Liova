@@ -24,22 +24,32 @@ public struct SideHUDState: Equatable, Sendable {
     }
 }
 
-/// A vertical level bar at the right edge of the screen, for volume and brightness.
+/// A vertical level bar at the edge of the screen: volume on the right, brightness on the
+/// left (create one controller per edge).
 ///
 /// One borderless, click-through panel, created on first use and reused. It's on screen
 /// only while visible: after the hide animation it's ordered out, so it costs nothing
 /// between key presses.
 @MainActor
 public final class SideHUDController {
+    public enum Edge: Sendable {
+        case leading
+        case trailing
+    }
+
     /// How long the bar stays after the last change.
     static let displayDuration: Duration = .milliseconds(1500)
     static let panelSize = CGSize(width: 96, height: 300)
 
-    private let model = SideHUDModel()
+    private let model: SideHUDModel
+    private let edge: Edge
     private var panel: NSPanel?
     private var hideTask: Task<Void, Never>?
 
-    public init() {}
+    public init(edge: Edge) {
+        self.edge = edge
+        model = SideHUDModel(edge: edge)
+    }
 
     public func show(_ state: SideHUDState) {
         let panel = panel ?? makePanel()
@@ -77,7 +87,7 @@ public final class SideHUDController {
         }
     }
 
-    /// Right edge, vertically centered, on the display with the pointer.
+    /// Its edge, vertically centered, on the display with the pointer.
     private func position(_ panel: NSPanel) {
         let pointer = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { $0.frame.contains(pointer) } ?? NSScreen.main
@@ -86,7 +96,7 @@ public final class SideHUDController {
         let size = Self.panelSize
         panel.setFrame(
             CGRect(
-                x: visible.maxX - size.width - 4,
+                x: edge == .trailing ? visible.maxX - size.width - 4 : visible.minX + 4,
                 y: visible.midY - size.height / 2,
                 width: size.width,
                 height: size.height
@@ -121,8 +131,13 @@ public final class SideHUDController {
 @MainActor
 @Observable
 final class SideHUDModel {
+    let edge: SideHUDController.Edge
     var state = SideHUDState(kind: .volume, level: 0, symbol: "speaker.wave.2.fill")
     var isVisible = false
+
+    init(edge: SideHUDController.Edge) {
+        self.edge = edge
+    }
 }
 
 /// The bar: a glass capsule with a filled level, the value on top and the symbol below.
@@ -158,15 +173,19 @@ struct SideHUDView: View {
                 .overlay(Capsule(style: .continuous).strokeBorder(.white.opacity(0.12), lineWidth: 0.5))
         }
         .environment(\.colorScheme, .dark)
-        .offset(x: model.isVisible ? 0 : 70)
+        .offset(x: model.isVisible ? 0 : (model.edge == .trailing ? 70 : -70))
         .opacity(model.isVisible ? 1 : 0)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-        .padding(.trailing, 14)
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: .infinity,
+            alignment: model.edge == .trailing ? .trailing : .leading
+        )
+        .padding(model.edge == .trailing ? .trailing : .leading, 14)
     }
 }
 
-/// The vertical level. The fill reveals a fixed gradient, like a level meter: volume runs
-/// green (quiet) through yellow to red (loud); brightness runs from dim amber to white.
+/// The vertical level. Volume reveals a level-meter gradient, green (quiet) through yellow
+/// to red (loud). Brightness is a warm, sunlit fill (amber to white) with no meter colors.
 private struct LevelTrack: View {
     let state: SideHUDState
 
@@ -191,8 +210,9 @@ private struct LevelTrack: View {
             LinearGradient(colors: [.green, .yellow, .orange, .red], startPoint: .bottom, endPoint: .top)
         case .brightness:
             LinearGradient(
-                colors: [Color(red: 1, green: 0.62, blue: 0.1), .yellow, .white],
-                startPoint: .bottom, endPoint: .top
+                colors: [Color(red: 1, green: 0.78, blue: 0.35), Color(red: 1, green: 0.93, blue: 0.7), .white],
+                startPoint: .bottom,
+                endPoint: .top
             )
         }
     }
