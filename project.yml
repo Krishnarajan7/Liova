@@ -1,0 +1,93 @@
+# XcodeGen spec. Run `make setup` (or `xcodegen`) to generate Liova.xcodeproj.
+# The generated project is not committed; edit this file instead.
+name: Liova
+
+options:
+  bundleIdPrefix: app.liova
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+packages:
+  LiovaKit:
+    path: Packages/LiovaKit
+
+settings:
+  base:
+    MARKETING_VERSION: 0.1.0
+    CURRENT_PROJECT_VERSION: 1
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    # No Apple Developer account yet: ad-hoc sign. Override with SIGN_IDENTITY in the Makefile.
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGN_STYLE: Manual
+    DEVELOPMENT_TEAM: ""
+    ENABLE_HARDENED_RUNTIME: YES
+    DEAD_CODE_STRIPPING: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+
+targets:
+  Liova:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+        excludes:
+          - Info.plist
+          - Liova.entitlements
+      # Now Playing helper script (BSD-3, see Vendor/mediaremote-adapter/VENDORED.md).
+      - path: Vendor/mediaremote-adapter/bin/mediaremote-adapter.pl
+        buildPhase: resources
+    dependencies:
+      - package: LiovaKit
+        product: LiovaCore
+      - package: LiovaKit
+        product: LiovaUI
+      - package: LiovaKit
+        product: LiovaFeatures
+      - package: LiovaKit
+        product: LiovaProviders
+      - package: LiovaKit
+        product: LiovaPluginKit
+      - package: LiovaKit
+        product: LiovaIPC
+      # Built by `make vendor`. Loaded by /usr/bin/perl at runtime, never linked by Liova.
+      - framework: build/vendor/mra/MediaRemoteAdapter.framework
+        embed: true
+        link: false
+        codeSign: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.liova.Liova
+        PRODUCT_NAME: Liova
+        GENERATE_INFOPLIST_FILE: NO
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleName: Liova
+        CFBundleDisplayName: Liova
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.utilities
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        LSUIElement: true
+        CFBundleURLTypes:
+          - CFBundleURLName: app.liova.Liova
+            CFBundleURLSchemes: [liova]
+        NSHumanReadableCopyright: Copyright © 2026 Krishnarajan. MIT License.
+    entitlements:
+      path: App/Liova.entitlements
+      properties:
+        # Not sandboxed: a notch app needs window-server access the sandbox forbids.
+        com.apple.security.app-sandbox: false
+
+schemes:
+  Liova:
+    build:
+      targets:
+        Liova: all
+    run:
+      config: Debug
+    archive:
+      config: Release

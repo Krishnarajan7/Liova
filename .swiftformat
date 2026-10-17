@@ -1,0 +1,12 @@
+--swiftversion 6.0
+--exclude build,Packages/LiovaKit/.build
+--indent 4
+--maxwidth 120
+--wraparguments before-first
+--wrapparameters before-first
+--wrapcollections before-first
+--commas always
+--self remove
+--importgrouping alpha
+--stripunusedargs closure-only
+--header ignore

@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: brew install swiftlint swiftformat
+      - name: SwiftLint
+        run: make lint
+      - name: SwiftFormat
+        run: make format-check
+
+  test:
+    name: Unit tests
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swift version
+        run: swift --version
+      - name: Test LiovaKit
+        run: make test
+
+  build:
+    name: Build app
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: CMake version (preinstalled on GitHub macOS runners)
+        run: cmake --version
+      - name: Build (ad-hoc signed)
+        run: make build

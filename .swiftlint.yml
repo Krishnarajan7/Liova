@@ -1,0 +1,47 @@
+included:
+  - App
+  - Packages/LiovaKit/Sources
+  - Packages/LiovaKit/Tests
+excluded:
+  - build
+  - Packages/LiovaKit/.build
+
+opt_in_rules:
+  - closure_spacing
+  - contains_over_first_not_nil
+  - empty_count
+  - first_where
+  - implicit_return
+  - modifier_order
+  - redundant_type_annotation
+  - sorted_imports
+  - toggle_bool
+  - weak_delegate
+
+analyzer_rules:
+  - unused_import
+
+disabled_rules:
+  - trailing_comma # SwiftFormat owns commas
+  - opening_brace  # SwiftFormat owns braces
+
+line_length:
+  warning: 120
+  error: 160
+  ignores_comments: true
+  ignores_urls: true
+
+file_length:
+  warning: 400
+  error: 600
+
+type_body_length:
+  warning: 250
+  error: 400
+
+function_body_length:
+  warning: 50
+  error: 80
+
+identifier_name:
+  excluded: [id, x, y, i, fd]

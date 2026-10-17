@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and ideas
+    url: https://github.com/Krishnarajan7/Liova/discussions
+    about: Ask questions, share setups, and discuss bigger ideas in GitHub Discussions.
+  - name: Report a security vulnerability
+    url: https://github.com/Krishnarajan7/Liova/security/advisories/new
+    about: Please report security problems privately, not as a public issue.
