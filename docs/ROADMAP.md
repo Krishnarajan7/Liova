@@ -72,6 +72,13 @@ Also done ahead of schedule:
 - [x] Unplug animation (bolt flies off, fill cools, light sweeps back)
 - [x] Downloads: browsers and Telegram, with size, speed and time left; metadata only
 - [x] Side-bar HUDs: volume on the right (green to red), brightness on the left
+- [x] File Shelf: drop files on the notch, drag them out anywhere, AirDrop in one click
+- [x] Interruptible open/close (fixed-size content, quick-return reopen) and full-screen awareness
+- [x] Timers page with presets, live countdown in the closed notch, done flash and sound
+- [x] Calendar "Next Up" with Join for video calls, and a Calendar page (opt-in)
+- [x] Camera and microphone in-use indicator
+- [x] Agent Island for Codex (status + approve/deny), Gemini CLI and Cursor (status; their hooks can't skip their own prompts)
+- [x] First-launch welcome card
 - [x] Settings window (launch at login, display placement, hover, haptics, battery) and a demo activity in the menu
 - [x] Measured on a Release build: 0.0% CPU idle, 0.17% with music playing, under 25 MB memory
 

@@ -12,11 +12,20 @@ public final class NotchChrome {
         public let symbol: String
         public let title: String
         let content: () -> AnyView
+        /// Whether the page shows right now (e.g. Calendar only once it's turned on).
+        let isAvailable: () -> Bool
 
-        public init(id: String, symbol: String, title: String, content: @escaping () -> AnyView) {
+        public init(
+            id: String,
+            symbol: String,
+            title: String,
+            isAvailable: @escaping () -> Bool = { true },
+            content: @escaping () -> AnyView
+        ) {
             self.id = id
             self.symbol = symbol
             self.title = title
+            self.isAvailable = isAvailable
             self.content = content
         }
     }
@@ -28,6 +37,8 @@ public final class NotchChrome {
     /// Shown right of the camera when no brief event is (e.g. battery level).
     public var trailingStatus: (() -> AnyView)?
     public var openSettings: (() -> Void)?
+    /// The page to show while files are dragged onto the notch (e.g. the Shelf).
+    public var dropPageID: String?
 
     public init() {}
 
@@ -36,7 +47,11 @@ public final class NotchChrome {
         pages.append(page)
     }
 
+    var visiblePages: [Page] {
+        pages.filter { $0.isAvailable() }
+    }
+
     var allPageIDs: [String] {
-        [Self.homePageID] + pages.map(\.id)
+        [Self.homePageID] + visiblePages.map(\.id)
     }
 }

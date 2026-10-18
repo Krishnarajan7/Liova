@@ -18,7 +18,7 @@ XCODEBUILD := xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration $(
 	-derivedDataPath $(DERIVED) -destination 'platform=macOS,arch=$(shell uname -m)' \
 	CODE_SIGN_IDENTITY="$(SIGN_IDENTITY)"
 
-.PHONY: help setup project vendor dev-cert build run cli test lint format format-check clean
+.PHONY: help setup project vendor dev-cert build run cli test test-intel lint format format-check clean
 
 help: ## Show this help
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-13s\033[0m %s\n", $$1, $$2}'
@@ -49,14 +49,18 @@ run: build ## Build and launch the app (restarts a running copy)
 	-@pkill -x Liova 2>/dev/null; true
 	open "$(APP)"
 
-cli: ## Build the `liova` command-line tool (release) into build/cli/liova
-	swift build --package-path $(PACKAGE_DIR) --product liova -c release
+cli: ## Build the `liova` command-line tool (universal: Apple Silicon + Intel) into build/cli/liova
+	swift build --package-path $(PACKAGE_DIR) --product liova -c release --arch arm64 --arch x86_64
 	@mkdir -p $(DERIVED)/cli
-	@cp "$$(swift build --package-path $(PACKAGE_DIR) -c release --show-bin-path)/liova" $(DERIVED)/cli/liova
+	@cp "$$(swift build --package-path $(PACKAGE_DIR) -c release --arch arm64 --arch x86_64 --show-bin-path)/liova" $(DERIVED)/cli/liova
+	@codesign --force -s "$(SIGN_IDENTITY)" $(DERIVED)/cli/liova 2>/dev/null || true
 	@echo "Built $(DERIVED)/cli/liova. Try: $(DERIVED)/cli/liova ping"
 
 test: ## Run package unit tests
 	swift test --package-path $(PACKAGE_DIR)
+
+test-intel: ## Run the package tests as Intel (x86_64) code under Rosetta
+	arch -x86_64 swift test --package-path $(PACKAGE_DIR) --arch x86_64
 
 lint: ## Lint with SwiftLint (strict)
 	swiftlint lint --strict --quiet

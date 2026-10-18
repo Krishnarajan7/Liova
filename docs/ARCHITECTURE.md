@@ -107,6 +107,22 @@ The notch renders every activity the same way by default: a symbol, a title and 
 
 The open notch has a header row beside the camera: page icons on the left (Home plus any registered pages, with a highlight that slides between them), and on the right either a brief event chip or a status view (battery level, green with a bolt while charging) and a Settings button. `NotchChrome` holds these: features contribute pages (`NotchChrome.Page`) and status views without `LiovaUI` knowing what they are. The System page (`SystemMonitorFeature`) samples CPU, memory and GPU load once a second, and only while a System page is on screen.
 
+### Timers, Calendar and the camera/mic indicator
+
+- **Timers** (`TimerFeature`): a running timer's activity carries its end date, so the engine ends it exactly on time; the countdown uses SwiftUI's timer text (redrawn once a second by the system) and one sleeping task per timer plays the sound and flash. Nothing in Liova ticks.
+- **Calendar** (`CalendarFeature`, opt-in): reloads on `EKEventStoreChanged` and otherwise sleeps until the next moment that matters (an event entering its ten-minute lead time, a minute tick inside it, a start or an end). Video-call links are found in the event's URL, location or notes.
+- **Camera and microphone** (`CaptureIndicatorFeature`): Core Audio and CoreMediaIO "running somewhere" property listeners; no audio or video is read and no permission is needed. Turning on flashes the notch; the open notch's header shows a dot while in use.
+
+### File Shelf
+
+Dragging files anywhere is recognized without reading them: at mouse-down the drag pasteboard's change count is noted, and the first drag event after a drag session begins checks only the advertised types for file URLs, once per drag (`FileDragDetector`). When the files come near a notch, it opens on the Shelf page (`NotchChrome.dropPageID`) with two drop zones, Keep on Shelf and AirDrop. The Shelf stores **bookmarks, not copies**, in `~/Library/Application Support/Liova/shelf.json`, so files stay where they are and are followed if moved. Tiles drag back out to any app (`NSItemProvider(contentsOf:)`), and AirDrop uses `NSSharingService(named: .sendViaAirDrop)`.
+
+### Motion details
+
+- Open and closed content are both mounted during a transition, each at a **fixed size**, and only clipped by the animating shape. Nothing reflows mid-animation, and reversing direction (hover in, out, in) continues from the current state instead of restarting.
+- The open content stays mounted for the length of the close animation; returning within 350 ms reopens immediately, and the pointer can "catch" the shape anywhere it is still visible.
+- Over a full-screen app (`FullScreenMonitor`, event-driven via Space/app/screen changes and the pointer reaching the top edge), the closed notch hides until hovered and its animations pause.
+
 ### Downloads
 
 Two event-driven sources feed `DownloadsFeature`: published file progress (`Progress.addSubscriber(forFileURL:)` on `~/Downloads`, used by Safari and others) and growing partial files seen through FSEvents (`.crdownload`, `.part`, Telegram's `_partial` media files). Only names and sizes are read, never contents. A 1 Hz sampler runs only while a download is active. Folder discovery runs off the main thread, because listing another app's container (Telegram, opt-in) can wait on a macOS privacy prompt. Details: [DOWNLOADS.md](DOWNLOADS.md).

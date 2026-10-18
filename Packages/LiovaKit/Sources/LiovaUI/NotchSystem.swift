@@ -13,6 +13,9 @@ public final class NotchSystem {
     private let renderers: ActivityRendererRegistry
     private let chrome: NotchChrome
     private let pointer = PointerMonitor()
+    private let fullScreen = FullScreenMonitor()
+    private var fileDrag = FileDragDetector()
+    private var dragTarget: String?
     private var controllers: [String: NotchController] = [:]
 
     public init(
@@ -34,11 +37,14 @@ public final class NotchSystem {
         displayManager.start()
         pointer.handler = { [weak self] event in self?.route(event) }
         pointer.start()
+        fullScreen.onChange = { [weak self] _ in self?.applyFullScreen() }
+        fullScreen.start()
         reconcile()
     }
 
     public func stop() {
         pointer.stop()
+        fullScreen.stop()
         displayManager.stop()
         controllers.values.forEach { $0.close() }
         controllers.removeAll()
@@ -58,10 +64,47 @@ public final class NotchSystem {
         target?.setAttention(true)
     }
 
+    private func draggedFile(at point: CGPoint) {
+        let pasteboard = NSPasteboard(name: .drag)
+        _ = fileDrag.dragged(dragPasteboardChangeCount: pasteboard.changeCount) {
+            pasteboard.types?.contains(.fileURL) ?? false
+        }
+        guard fileDrag.isFileDragActive, chrome.dropPageID != nil else { return }
+        // Open the notch the files are heading for; close any other.
+        let target = controllers.first { $0.value.dragApproachZone().contains(point) }?.key
+        guard target != dragTarget else { return }
+        if let previous = dragTarget {
+            controllers[previous]?.setFileDrag(false, dropPage: nil)
+        }
+        dragTarget = target
+        if let target {
+            controllers[target]?.setFileDrag(true, dropPage: chrome.dropPageID)
+        }
+    }
+
+    /// The drop (if any) has been delivered by now; give it a beat, then let go.
+    private func endFileDrag() {
+        guard let target = dragTarget else { return }
+        dragTarget = nil
+        Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(250))
+            self?.controllers[target]?.setFileDrag(false, dropPage: nil)
+        }
+    }
+
+    private func applyFullScreen() {
+        let covered = settings.hideInFullScreen ? fullScreen.coveredDisplays : []
+        Log.display.info("Full-screen displays: \(covered.count)")
+        for controller in controllers.values {
+            controller.setCoveredByFullScreen(covered.contains(controller.display.displayID))
+        }
+    }
+
     /// Call after settings change.
     public func settingsDidChange() {
         reconcile()
         controllers.values.forEach { $0.settingsDidChange() }
+        applyFullScreen()
     }
 
     private func reconcile() {
@@ -94,9 +137,20 @@ public final class NotchSystem {
     private func route(_ event: PointerMonitor.Event) {
         switch event {
         case let .moved(point):
+            if controllers.values.contains(where: { $0.isNearTop(point) }) {
+                fullScreen.pointerNearTop()
+            }
             controllers.values.forEach { $0.pointerMoved(to: point) }
         case let .mouseDown(point):
+            fileDrag.mouseDown(dragPasteboardChangeCount: NSPasteboard(name: .drag).changeCount)
             controllers.values.forEach { $0.mouseDown(at: point) }
+        case let .dragged(point):
+            draggedFile(at: point)
+            controllers.values.forEach { $0.pointerMoved(to: point) }
+        case .leftMouseUp:
+            if fileDrag.mouseUp() {
+                endFileDrag()
+            }
         }
     }
 }

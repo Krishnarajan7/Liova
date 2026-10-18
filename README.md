@@ -13,7 +13,6 @@ Native Swift, smooth by design, and it uses no CPU while there's nothing to show
 ![Idle CPU 0%](https://img.shields.io/badge/idle%20CPU-0.0%25-brightgreen)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-<img src="docs/assets/agent-island.png" width="560" alt="Liova's notch showing Claude Code asking to run a command, with Allow and Deny buttons">
 
 </div>
 
@@ -31,15 +30,11 @@ Native Swift, smooth by design, and it uses no CPU while there's nothing to show
 **🎵 Now Playing, from any app**<br>
 Spotify, Apple Music, YouTube in your browser, podcasts. Artwork, play/pause, skip and a scrubber you can drag. Small bars move in the closed notch while music plays.
 
-<img src="docs/assets/now-playing.png" alt="Now Playing in the open notch">
-
 </td>
 <td width="50%" valign="top">
 
 **🤖 Agent Island**<br>
 See what Claude Code is doing ("Running `swift test`", "Editing App.swift") and approve or deny its requests from the notch. One command to set up. If you ignore it, Claude simply asks in the terminal as usual.
-
-<img src="docs/assets/agent-island.png" alt="Claude Code asking for permission in the notch">
 
 </td>
 </tr>
@@ -49,15 +44,11 @@ See what Claude Code is doing ("Running `swift test`", "Editing App.swift") and 
 **⚡ A charging moment**<br>
 Plug in and a little battery fills up, a bolt pops in and a streak of light runs along the notch. Quick events show as a chip, so the notch keeps showing your music.
 
-<img src="docs/assets/charging.png" alt="A charging chip beside the camera while music stays in the notch">
-
 </td>
 <td valign="top">
 
 **🔊 A better volume and brightness HUD**<br>
 Slim level bars at the edges of the screen: volume on the right, running green to red as it gets louder, and brightness on the left. Or keep them in the notch. Opt-in, and they can never break the system HUD.
-
-<img src="docs/assets/side-hud.png" width="96" alt="Vertical volume bar">
 
 </td>
 </tr>
@@ -66,8 +57,6 @@ Slim level bars at the edges of the screen: volume on the right, running green t
 
 **📊 System at a glance**<br>
 Live CPU, memory and GPU with a minute of history, one tap away in the open notch. It measures only while you're looking.
-
-<img src="docs/assets/system.png" alt="CPU, memory and GPU graphs in the notch">
 
 </td>
 <td valign="top">
@@ -81,6 +70,10 @@ Browser and Telegram downloads show up with size, speed and time left, then flas
 
 Also:
 
+- **A File Shelf.** Drag files onto the notch to keep them handy, drag them out into any app, or AirDrop them in one click.
+- **Timers and your calendar.** Start a timer in one tap and watch it count down in the notch; your next meeting appears ten minutes early with a Join button.
+- **Camera and mic alerts.** The notch flashes when any app turns on your camera or microphone, even in full-screen apps.
+- **Stays out of your movie.** Over full-screen apps the notch hides until you hover it, and nothing in it animates.
 - **Every Mac.** It matches the camera housing exactly on notched MacBooks and draws a virtual notch on everything else, including external displays, one per display.
 - **Feels right.** Springs that never overshoot, a hover that ignores a passing pointer, and clicks that go straight through to the menu bar underneath.
 - **Scriptable.** Anything can light up the notch:
@@ -91,11 +84,11 @@ Also:
 
   The same works over a local socket and `liova://` links. See the [plugin API](docs/PLUGIN-API.md).
 
-*Screenshots are real renders of Liova's views, not mockups.*
+> Screenshots and a short demo video are coming. Want to help? See [#1](https://github.com/Krishnarajan7/Liova/issues/1).
 
 ## Get it
 
-You'll need macOS 14 or later and Xcode 26 or later.
+Liova runs on Apple Silicon and Intel Macs (one universal app). To build it you'll need macOS 14 or later and Xcode 26 or later.
 
 ```bash
 brew install xcodegen swiftlint swiftformat cmake
@@ -112,7 +105,7 @@ make cli
 build/cli/liova agents install claude-code   # adds hooks to ~/.claude/settings.json, keeps a backup
 ```
 
-Undo it any time with `liova agents uninstall claude-code`. See [Agent Island](docs/AGENT-ISLAND.md) for exactly what is and isn't sent.
+The same works for `codex`, `gemini-cli` and `cursor`; `liova agents status` shows all four. Undo any of them with `liova agents uninstall <agent>`. See [Agent Island](docs/AGENT-ISLAND.md) for exactly what is and isn't sent.
 
 > [!TIP]
 > Volume and brightness HUDs need the Accessibility permission. Development builds change identity
@@ -164,9 +157,10 @@ Read more in [ARCHITECTURE.md](docs/ARCHITECTURE.md) and the [decision log](docs
 - [x] Plugin API: CLI, socket and `liova://` links
 - [x] Agent Island for Claude Code
 - [x] Downloads, System page, open-notch pages with battery status
-- [ ] File shelf with AirDrop
-- [ ] Agent Island for Codex, Cursor and Gemini CLI
-- [ ] Timers, calendar, Focus, AirPods and more live activities
+- [x] File Shelf with AirDrop
+- [x] Agent Island for Codex (with approve/deny), Gemini CLI and Cursor (status)
+- [x] Timers, calendar "Next Up", camera and mic indicator
+- [ ] Focus, AirPods and more live activities
 - [ ] Signed releases, auto-updates and a Homebrew tap
 - [ ] **v1.0, planned for February 2027**
 

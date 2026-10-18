@@ -22,8 +22,8 @@ public struct EqualizerBars: NSViewRepresentable {
         EqualizerBarsView(barCount: barCount)
     }
 
-    public func updateNSView(_ view: EqualizerBarsView, context _: Context) {
-        view.update(color: color, isAnimating: isAnimating)
+    public func updateNSView(_ view: EqualizerBarsView, context: Context) {
+        view.update(color: color, isAnimating: isAnimating && context.environment.notchCompactVisible)
     }
 }
 

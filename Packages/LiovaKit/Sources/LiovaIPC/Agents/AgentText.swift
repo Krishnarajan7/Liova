@@ -45,7 +45,8 @@ public enum AgentText {
         result.reserveCapacity(text.utf8.count)
         var pendingSpace = false
         for character in text {
-            if character.isWhitespace || character.isNewline || isControl(character) {
+            let visible = character.isWhitespace || character.isNewline ? nil : withoutControls(character)
+            guard let visible else {
                 pendingSpace = !result.isEmpty
                 continue
             }
@@ -53,7 +54,7 @@ public enum AgentText {
                 result.append(" ")
                 pendingSpace = false
             }
-            result.append(character)
+            result.append(contentsOf: visible)
         }
         return result
     }
@@ -66,8 +67,8 @@ public enum AgentText {
         for character in text {
             if character == "\n" || character == "\t" || character == "\r\n" {
                 result.append(character == "\r\n" ? "\n" : character)
-            } else if !isControl(character) {
-                result.append(character)
+            } else if let visible = withoutControls(character) {
+                result.append(contentsOf: visible)
             }
         }
         return result
@@ -92,10 +93,23 @@ public enum AgentText {
         return component
     }
 
-    private static func isControl(_ character: Character) -> Bool {
-        character.unicodeScalars.allSatisfy { scalar in
-            scalar.properties.generalCategory == .control || scalar.properties.generalCategory == .format
-                && scalar.value != 0x200D // Keep zero-width joiners inside emoji sequences.
+    /// `character` without control and format scalars (bidi overrides, zero-width spaces...),
+    /// or `nil` if nothing visible is left. Filtering scalars, not whole characters, matters:
+    /// a bidi override followed by a combining mark forms one character that would otherwise
+    /// slip through. Zero-width joiners inside emoji sequences are kept.
+    private static func withoutControls(_ character: Character) -> String? {
+        let scalars = character.unicodeScalars
+        guard scalars.contains(where: isControl) else { return String(character) }
+        var kept = String.UnicodeScalarView()
+        kept.append(contentsOf: scalars.filter { !isControl($0) })
+        return kept.isEmpty ? nil : String(kept)
+    }
+
+    private static func isControl(_ scalar: Unicode.Scalar) -> Bool {
+        switch scalar.properties.generalCategory {
+        case .control: true
+        case .format: scalar.value != 0x200D
+        default: false
         }
     }
 }

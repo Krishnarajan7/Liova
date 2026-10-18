@@ -2,19 +2,8 @@ import Darwin
 import Foundation
 import LiovaPluginKit
 
-/// Coding agents Liova can hook into.
-public enum AgentKind: String, CaseIterable, Sendable {
-    case claudeCode = "claude-code"
-
-    /// Name for people, e.g. in `liova agents status`.
-    public var displayName: String {
-        switch self {
-        case .claudeCode: "Claude Code"
-        }
-    }
-}
-
-/// What Claude Code expects on stdout from a `PermissionRequest` hook.
+/// What Claude Code expects on stdout from a `PermissionRequest` hook. Codex reads the same
+/// format (see ``CodexHookAdapter``).
 public enum ClaudeCodeHookOutput {
     /// The message Claude Code shows (and tells the model) when the user denies from the notch.
     public static let denyMessage = "Denied from the Liova notch."
@@ -78,7 +67,8 @@ public struct AgentHookRunner: Sendable {
     }
 
     /// Runs the hook for one input and returns what to print on stdout (`nil`: nothing).
-    /// `input` is `nil` when stdin couldn't be read or was too large.
+    /// `input` is `nil` when stdin couldn't be read or was too large. It is the agent's JSON
+    /// payload, whether it arrived on stdin or (Codex's `notify`) as an argument.
     public func run(input: Data?) -> String? {
         guard let input else {
             log?("No usable input on stdin; ignoring.")
@@ -101,14 +91,12 @@ public struct AgentHookRunner: Sendable {
                 return nil
             }
             log?("Decision: \(decision.rawValue).")
-            return ClaudeCodeHookOutput.permissionDecision(decision)
+            return agent.adapter(permissionTimeout: permissionTimeout).output(for: decision)
         }
     }
 
     func adapt(_ input: Data) -> AgentHookAction {
-        switch agent {
-        case .claudeCode: ClaudeCodeHookAdapter(permissionTimeout: permissionTimeout).adapt(input)
-        }
+        agent.adapter(permissionTimeout: permissionTimeout).adapt(input)
     }
 
     /// Sends one command. Returns the response only if Liova accepted it.

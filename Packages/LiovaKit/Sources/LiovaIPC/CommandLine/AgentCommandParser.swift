@@ -8,11 +8,20 @@ public struct AgentHookOptions: Equatable, Sendable {
     public var permissionTimeout: TimeInterval
     /// Overrides the socket path (otherwise `$LIOVA_SOCKET` or the default).
     public var socketPath: String?
+    /// The hook payload given as an argument instead of on stdin. Only Codex's `notify`
+    /// program setting passes it this way.
+    public var payload: String?
 
-    public init(agent: AgentKind, permissionTimeout: TimeInterval = 300, socketPath: String? = nil) {
+    public init(
+        agent: AgentKind,
+        permissionTimeout: TimeInterval = 300,
+        socketPath: String? = nil,
+        payload: String? = nil
+    ) {
         self.agent = agent
         self.permissionTimeout = permissionTimeout
         self.socketPath = socketPath
+        self.payload = payload
     }
 }
 
@@ -83,7 +92,8 @@ enum AgentCommandParser {
         options: [String: String],
         wantsHelp: Bool
     ) throws(CLIUsageError) -> CLIInvocation {
-        let (command, agentWord) = try resolve(path)
+        let resolved = try resolve(path)
+        let (command, agentWord, payload) = (resolved.command, resolved.agent, resolved.payload)
         if wantsHelp {
             return .showHelp(command?.help ?? CLIHelp.agents)
         }
@@ -103,10 +113,14 @@ enum AgentCommandParser {
         }
         if command == .hook {
             guard let agent else { throw missingAgent(command) }
+            if let payload, agent != .codex {
+                throw CLIUsageError("Unexpected argument '\(payload)'.", command: command.displayName)
+            }
             return try .hook(AgentHookOptions(
                 agent: agent,
                 permissionTimeout: permissionTimeout(options),
-                socketPath: socketPath(options, command: command)
+                socketPath: socketPath(options, command: command),
+                payload: payload
             ))
         }
         return try .agents(agentsRequest(command, agent: agent, options: options))
@@ -129,6 +143,12 @@ enum AgentCommandParser {
             guard let agent else { throw missingAgent(command) }
             return .uninstall(agent, settingsPath: settings, dryRun: dryRun)
         case .status:
+            if agent == nil, settings != nil {
+                throw CLIUsageError(
+                    "--settings needs an agent, e.g. 'liova agents status codex --settings PATH'.",
+                    command: command.displayName
+                )
+            }
             return .status(agent, settingsPath: settings)
         }
     }
@@ -139,8 +159,16 @@ enum AgentCommandParser {
 
     // MARK: Helpers
 
-    /// The command and the agent word after it. `nil` command means bare `liova agents`.
-    private static func resolve(_ path: [String]) throws(CLIUsageError) -> (command: Command?, agent: String?) {
+    /// The words of a `hook` or `agents` command line.
+    private struct Resolved {
+        /// `nil` means bare `liova agents`.
+        var command: Command?
+        var agent: String?
+        /// For `hook` only, one more argument: Codex's `notify` passes its JSON payload that way.
+        var payload: String?
+    }
+
+    private static func resolve(_ path: [String]) throws(CLIUsageError) -> Resolved {
         let command: Command?
         let rest: ArraySlice<String>
         if path[0] == "hook" {
@@ -159,10 +187,12 @@ enum AgentCommandParser {
                 command: "liova agents"
             )
         }
-        if rest.count > 1, let command {
-            throw CLIUsageError("Unexpected argument '\(rest[rest.startIndex + 1])'.", command: command.displayName)
+        let allowed = command == .hook ? 2 : 1
+        if rest.count > allowed, let command {
+            let extra = rest[rest.startIndex + allowed]
+            throw CLIUsageError("Unexpected argument '\(extra)'.", command: command.displayName)
         }
-        return (command, rest.first)
+        return Resolved(command: command, agent: rest.first, payload: rest.dropFirst().first)
     }
 
     private static func agentKind(_ word: String, command: Command) throws(CLIUsageError) -> AgentKind {
@@ -170,7 +200,10 @@ enum AgentCommandParser {
             return agent
         }
         let names = AgentKind.allCases.map(\.rawValue)
-        let hint = CLIParser.suggestion(for: word.lowercased(), among: Set(names))
+        var hint = CLIParser.suggestion(for: word.lowercased(), among: Set(names))
+        if hint.isEmpty, word.count >= 3, let match = names.first(where: { $0.hasPrefix(word.lowercased()) }) {
+            hint = " Did you mean '\(match)'?"
+        }
         throw CLIUsageError(
             "Unknown agent '\(word)'.\(hint) Supported: \(names.joined(separator: ", ")).",
             command: command.displayName

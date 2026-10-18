@@ -30,10 +30,37 @@ public enum AgentCLIOutput {
         }
         if !dryRun, plan.operation == .install {
             lines.append("")
-            lines.append("Start a new \(name) session to pick up the hooks. Sessions that are already running")
-            lines.append("may ask you to review the change in /hooks first.")
+            lines += nextSteps(agent)
         }
         return lines.joined(separator: "\n")
+    }
+
+    /// What to do after installing, and what to expect from the notch.
+    private static func nextSteps(_ agent: AgentKind) -> [String] {
+        switch agent {
+        case .claudeCode:
+            [
+                "Start a new Claude Code session to pick up the hooks. Sessions that are already running",
+                "may ask you to review the change in /hooks first.",
+            ]
+        case .codex:
+            [
+                "Start a new Codex session. Codex runs new or changed hooks only after you trust them:",
+                "review and trust Liova's hooks when Codex asks, or in its /hooks menu.",
+            ]
+        case .geminiCLI:
+            [
+                "Start a new Gemini CLI session to pick up the hooks.",
+                "Gemini CLI doesn't let hooks answer its permission prompts, so the notch shows when it's",
+                "waiting for you and you approve in the terminal.",
+            ]
+        case .cursor:
+            [
+                "Cursor reloads hooks.json by itself; restart Cursor if nothing shows up.",
+                "Cursor's hooks can't reliably approve actions, so the notch shows what the agent is doing",
+                "and you approve in Cursor.",
+            ]
+        }
     }
 
     private static func headline(for plan: AgentInstallPlan, name: String, dryRun: Bool) -> String {
@@ -77,6 +104,7 @@ public enum AgentCLIOutput {
             lines += status.problems.map { "  - \($0)" }
             lines.append("  Fix it with: liova agents install \(agent.rawValue)")
         }
+        lines += status.warnings.map { "  Warning: \($0)" }
         return lines.joined(separator: "\n")
     }
 }

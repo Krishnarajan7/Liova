@@ -25,6 +25,9 @@ struct AgentCLIParserTests {
         ("hook claude-code --timeout=45", AgentHookOptions(agent: .claudeCode, permissionTimeout: 45)),
         ("hook claude-code --socket /tmp/s.sock", AgentHookOptions(agent: .claudeCode, socketPath: "/tmp/s.sock")),
         ("--socket /tmp/s.sock hook claude-code", AgentHookOptions(agent: .claudeCode, socketPath: "/tmp/s.sock")),
+        ("hook codex", AgentHookOptions(agent: .codex)),
+        ("hook gemini-cli", AgentHookOptions(agent: .geminiCLI)),
+        ("hook cursor --timeout 90", AgentHookOptions(agent: .cursor, permissionTimeout: 90)),
     ])
     func hookCommands(line: String, expected: AgentHookOptions) throws {
         #expect(try parse(line) == .hook(expected))
@@ -40,6 +43,13 @@ struct AgentCLIParserTests {
         ("agents uninstall claude-code --dry-run", .uninstall(.claudeCode, settingsPath: nil, dryRun: true)),
         ("agents status", .status(nil, settingsPath: nil)),
         ("agents status claude-code --settings=/tmp/s.json", .status(.claudeCode, settingsPath: "/tmp/s.json")),
+        ("agents install codex", .install(.codex, settingsPath: nil, dryRun: false)),
+        ("agents install gemini-cli --dry-run", .install(.geminiCLI, settingsPath: nil, dryRun: true)),
+        (
+            "agents uninstall cursor --settings /tmp/h.json",
+            .uninstall(.cursor, settingsPath: "/tmp/h.json", dryRun: false)
+        ),
+        ("agents status Cursor", .status(.cursor, settingsPath: nil)),
     ])
     func agentsCommands(line: String, expected: AgentsRequest) throws {
         #expect(try parse(line) == .agents(expected))
@@ -62,8 +72,12 @@ struct AgentCLIParserTests {
     @Test(arguments: [
         ("agents", "Missing subcommand"),
         ("agents instal claude-code", "Did you mean 'install'?"),
-        ("agents install", "Missing agent name. Supported: claude-code."),
-        ("agents install codex", "Unknown agent 'codex'."),
+        ("agents install", "Missing agent name. Supported: claude-code, codex, gemini-cli, cursor."),
+        ("agents install copilot", "Unknown agent 'copilot'."),
+        ("agents install gemini", "Did you mean 'gemini-cli'?"),
+        ("agents status --settings /tmp/x.json", "--settings needs an agent"),
+        ("hook claude-code {}", "Unexpected argument '{}'."),
+        ("hook cursor a b", "Unexpected argument 'b'."),
         ("agents install claude-cod", "Did you mean 'claude-code'?"),
         ("agents install claude-code extra", "Unexpected argument 'extra'."),
         ("agents install claude-code --json", "has no option --json"),
@@ -96,6 +110,20 @@ struct AgentCLIParserTests {
     ])
     func detectsHookInvocations(arguments: [String], expected: Bool) {
         #expect(CLIParser.isHookInvocation(arguments) == expected)
+    }
+
+    @Test func codexNotifyPassesItsPayloadAsAnArgument() throws {
+        let payload = #"{"type":"agent-turn-complete","thread-id":"t","cwd":"/w"}"#
+        let invocation = try CLIParser.parse(["hook", "codex", payload])
+        #expect(invocation == .hook(AgentHookOptions(agent: .codex, payload: payload)))
+        #expect(CLIParser.isHookInvocation(["hook", "codex", payload]))
+    }
+
+    @Test func helpNamesEveryAgent() {
+        for agent in AgentKind.allCases {
+            #expect(CLIHelp.agents.contains(agent.rawValue))
+            #expect(CLIHelp.hook.contains(agent.rawValue))
+        }
     }
 
     @Test func mainHelpListsTheNewCommands() {

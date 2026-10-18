@@ -29,10 +29,18 @@ enum AgentCommandRunner {
         if debugEnabled {
             runner.log = { message in debugLog(message) }
         }
-        if let output = runner.run(input: AgentHookInput.read()) {
+        if let output = runner.run(input: input(for: options)) {
             FileHandle.standardOutput.write(Data((output + "\n").utf8))
         }
         return CLIOutput.ExitCode.success.rawValue
+    }
+
+    /// The hook payload: the argument Codex's `notify` passes, or else stdin. With an argument,
+    /// stdin is never touched (it may be an inherited terminal or a pipe nobody closes).
+    private static func input(for options: AgentHookOptions) -> Data? {
+        guard let payload = options.payload else { return AgentHookInput.read() }
+        let data = Data(payload.utf8)
+        return data.count <= AgentHookRunner.maxInputBytes ? data : nil
     }
 
     // MARK: liova agents
@@ -70,6 +78,11 @@ enum AgentCommandRunner {
             let plan = try installer.plan(operation)
             let result = dryRun ? nil : try installer.apply(plan)
             print(AgentCLIOutput.report(for: plan, agent: agent, result: result, dryRun: dryRun))
+            if operation == .install {
+                for warning in installer.warnings() {
+                    CLIRunner.writeError("liova: warning: \(warning)\n")
+                }
+            }
             return CLIOutput.ExitCode.success.rawValue
         } catch {
             CLIRunner.writeError("liova: error: \(error.description)\n")
@@ -77,6 +90,7 @@ enum AgentCommandRunner {
         }
     }
 
+    /// Reports every agent in `agents`; one unreadable file doesn't hide the others.
     private static func status(agents: [AgentKind], settingsPath: String?) -> Int32 {
         var allInstalled = true
         for agent in agents {
@@ -89,24 +103,22 @@ enum AgentCommandRunner {
                 let path = installer.settingsURL.path(percentEncoded: false)
                 print(AgentCLIOutput.status(status, agent: agent, settingsPath: path))
             } catch {
+                allInstalled = false
+                print("\(agent.displayName): unknown")
                 CLIRunner.writeError("liova: error: \(error.description)\n")
-                return CLIOutput.ExitCode.serverError.rawValue
             }
         }
         return allInstalled ? CLIOutput.ExitCode.success.rawValue : CLIOutput.ExitCode.serverError.rawValue
     }
 
-    private static func installer(for agent: AgentKind, settingsPath: String?) -> ClaudeCodeHookInstaller? {
+    private static func installer(for agent: AgentKind, settingsPath: String?) -> AgentHookInstaller? {
         guard let executable = AgentExecutable.currentPath() else {
             CLIRunner.writeError("liova: error: Couldn't find the path of the liova binary.\n")
             return nil
         }
-        switch agent {
-        case .claudeCode:
-            let settingsURL = settingsPath.map {
-                URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath).standardizedFileURL
-            } ?? ClaudeCodeHookInstaller.defaultSettingsURL()
-            return ClaudeCodeHookInstaller(settingsURL: settingsURL, executablePath: executable)
+        let settingsURL = settingsPath.map {
+            URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath).standardizedFileURL
         }
+        return AgentHookInstaller(agent: agent, settingsURL: settingsURL, executablePath: executable)
     }
 }

@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import LiovaCore
 @testable import LiovaUI
@@ -99,5 +100,92 @@ struct EqualizerBarsTests {
             previous = levels
         }
         #expect(changes > 190)
+    }
+}
+
+struct FullScreenMonitorTests {
+    let display = (id: CGDirectDisplayID(1), bounds: CGRect(x: 0, y: 0, width: 1710, height: 1112))
+    let external = (id: CGDirectDisplayID(2), bounds: CGRect(x: 1710, y: 0, width: 2560, height: 1440))
+
+    private func window(pid: Int32 = 42, layer: Int = 0, bounds: CGRect, alpha: Double = 1) -> [String: Any] {
+        [
+            kCGWindowOwnerPID as String: NSNumber(value: pid),
+            kCGWindowLayer as String: NSNumber(value: layer),
+            kCGWindowAlpha as String: NSNumber(value: alpha),
+            kCGWindowBounds as String: bounds.dictionaryRepresentation,
+        ]
+    }
+
+    @Test func fullScreenWindowCoversItsDisplay() {
+        let covered = FullScreenMonitor.coveredDisplays(
+            windows: [window(bounds: display.bounds)], displays: [display, external], ownPID: 1
+        )
+        #expect(covered == [1])
+    }
+
+    @Test func ordinaryAndOwnWindowsDontCount() {
+        let covered = FullScreenMonitor.coveredDisplays(
+            windows: [
+                window(bounds: CGRect(x: 0, y: 25, width: 1710, height: 1087)), // maximized, below menu bar
+                window(pid: 1, bounds: display.bounds), // Liova itself
+                window(layer: -2_147_483_603, bounds: display.bounds), // desktop
+                window(bounds: display.bounds, alpha: 0), // invisible
+                window(layer: 25, bounds: display.bounds), // status-level overlay
+            ],
+            displays: [display, external], ownPID: 1
+        )
+        #expect(covered.isEmpty)
+    }
+
+    @Test func externalDisplayCanBeCoveredAlone() {
+        let covered = FullScreenMonitor.coveredDisplays(
+            windows: [window(bounds: external.bounds)], displays: [display, external], ownPID: 1
+        )
+        #expect(covered == [2])
+    }
+}
+
+struct FileDragDetectorTests {
+    @Test func fileDragIsRecognizedOnceTheDragSessionStarts() {
+        var detector = FileDragDetector()
+        detector.mouseDown(dragPasteboardChangeCount: 10)
+        // Moving before the drag session writes the pasteboard: not decided yet.
+        let early = detector.dragged(dragPasteboardChangeCount: 10) { true }
+        let started = detector.dragged(dragPasteboardChangeCount: 11) { true }
+        #expect(!early)
+        #expect(started)
+        #expect(detector.isFileDragActive)
+        let ended = detector.mouseUp()
+        #expect(ended)
+        #expect(!detector.isFileDragActive)
+    }
+
+    @Test func nonFileDragsAreIgnoredForTheWholeDrag() {
+        var detector = FileDragDetector()
+        detector.mouseDown(dragPasteboardChangeCount: 3)
+        let first = detector.dragged(dragPasteboardChangeCount: 4) { false }
+        // Decided once per drag: later events don't re-check the pasteboard.
+        var checked = false
+        let later = detector.dragged(dragPasteboardChangeCount: 5) {
+            checked = true
+            return true
+        }
+        let ended = detector.mouseUp()
+        #expect(!first)
+        #expect(!later)
+        #expect(!checked)
+        #expect(!ended)
+    }
+
+    @Test func windowMovesAndSelectionsNeverCount() {
+        var detector = FileDragDetector()
+        detector.mouseDown(dragPasteboardChangeCount: 7)
+        var any = false
+        for _ in 0 ..< 20 {
+            any = detector.dragged(dragPasteboardChangeCount: 7) { true } || any
+        }
+        let ended = detector.mouseUp()
+        #expect(!any)
+        #expect(!ended)
     }
 }

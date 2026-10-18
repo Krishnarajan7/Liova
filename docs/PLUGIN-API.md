@@ -181,15 +181,26 @@ notch activity start --id ci-build --source ci --title "Build passed" --symbol c
 
 ### Agent Island: `liova agents` and `liova hook`
 
-To show Claude Code in the notch, with approve and deny for its permission requests, run:
+To show a coding agent in the notch, run `liova agents install` with its name:
 
 ```sh
 liova agents install claude-code     # --dry-run to preview, --settings PATH for another file
-liova agents status
-liova agents uninstall claude-code
+liova agents install codex           # ~/.codex/hooks.json; trust the hooks in Codex's /hooks
+liova agents install gemini-cli      # ~/.gemini/settings.json
+liova agents install cursor          # ~/.cursor/hooks.json
+liova agents status                  # every agent; or 'status codex [--settings PATH]'
+liova agents uninstall codex
 ```
 
-The installer merges Liova's hooks into `~/.claude/settings.json` (keeping everything else and making a backup first); each hook runs `liova hook claude-code`, which reads the hook event on stdin, sends an [`agentEvent` or `agentPermission`](#agent-island) request, and always exits 0. See [AGENT-ISLAND.md](AGENT-ISLAND.md) for what is sent, how approval works, and troubleshooting.
+| Command | What it does |
+| --- | --- |
+| `liova agents install AGENT [--settings PATH] [--dry-run]` | Merges Liova's hooks into the agent's settings, keeping everything else and backing the file up first. Idempotent; refuses files that aren't valid JSON. |
+| `liova agents uninstall AGENT [--settings PATH] [--dry-run]` | Removes only Liova's hooks. |
+| `liova agents status [AGENT [--settings PATH]]` | Installed, not installed, or outdated (with reasons), plus warnings such as the agent's hooks being turned off. Exits 0 only when every listed agent is installed and current. |
+| `liova hook AGENT [--timeout DURATION] [--socket PATH]` | Run by the installed hooks: reads the hook event on stdin, sends an [`agentEvent` or `agentPermission`](#agent-island) request, prints the agent's decision format for a permission answer and nothing otherwise, and always exits 0. |
+| `liova hook codex PAYLOAD` | The same for Codex's older `notify` setting, which passes its JSON as an argument. |
+
+`AGENT` is `claude-code`, `codex`, `gemini-cli` or `cursor`. Approve and deny work for Claude Code and Codex; Gemini CLI and Cursor show status only, because their hooks can't answer the agent's own permission prompt. See [AGENT-ISLAND.md](AGENT-ISLAND.md) for what is sent, how approval works, each agent's setup, and troubleshooting.
 
 ### Example: Claude Code hooks by hand
 

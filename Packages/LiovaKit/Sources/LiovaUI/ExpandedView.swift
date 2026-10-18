@@ -38,7 +38,7 @@ struct ExpandedView: View {
         let notch = model.geometry.notchSize
         return HStack(spacing: 0) {
             HStack {
-                if !chrome.pages.isEmpty {
+                if !chrome.visiblePages.isEmpty {
                     PageBar(model: model, chrome: chrome)
                 }
                 Spacer(minLength: 0)
@@ -71,7 +71,7 @@ struct ExpandedView: View {
             if selected == NotchChrome.homePageID {
                 HomePage(engine: engine, renderers: renderers)
                     .transition(Self.pageTransition)
-            } else if let page = chrome.pages.first(where: { $0.id == selected }) {
+            } else if let page = chrome.visiblePages.first(where: { $0.id == selected }) {
                 page.content()
                     .transition(Self.pageTransition)
             }
@@ -128,8 +128,11 @@ private struct PageBar: View {
     @Namespace private var highlight
 
     var body: some View {
-        HStack(spacing: 2) {
-            ForEach(chrome.allPageIDs, id: \.self) { id in
+        let ids = chrome.allPageIDs
+        // Five icons must still fit left of the camera; tighten a little when there are many.
+        let width: CGFloat = ids.count > 4 ? 22 : 26
+        HStack(spacing: ids.count > 4 ? 1 : 2) {
+            ForEach(ids, id: \.self) { id in
                 let isSelected = model.selectedPage == id
                 Button {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) {
@@ -139,7 +142,7 @@ private struct PageBar: View {
                     Image(systemName: symbol(for: id))
                         .font(.system(size: 11.5, weight: .semibold))
                         .foregroundStyle(.white.opacity(isSelected ? 1 : 0.45))
-                        .frame(width: 26, height: 22)
+                        .frame(width: width, height: 22)
                         .background {
                             if isSelected {
                                 Capsule()

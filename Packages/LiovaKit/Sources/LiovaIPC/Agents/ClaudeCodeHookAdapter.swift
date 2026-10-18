@@ -1,16 +1,6 @@
 import Foundation
 import LiovaPluginKit
 
-/// What a hook invocation should do once its input is understood.
-public enum AgentHookAction: Equatable, Sendable {
-    /// Report the event to Liova and print nothing.
-    case event(AgentEvent)
-    /// Ask Liova for a decision and print it for the agent.
-    case permission(AgentPermissionRequest)
-    /// Nothing to send. The reason is only for `LIOVA_HOOK_DEBUG` logging.
-    case ignore(reason: String)
-}
-
 /// Translates Claude Code hook input (the JSON object on the hook's stdin) into Liova's
 /// agent vocabulary. Pure: no I/O, no clock, so every mapping is unit-tested.
 ///
@@ -19,14 +9,11 @@ public enum AgentHookAction: Equatable, Sendable {
 ///
 /// Privacy: prompt text, assistant messages, file contents and tool output are never
 /// forwarded. Events carry the kind, the project folder name and a short tool summary.
-public struct ClaudeCodeHookAdapter: Sendable {
+public struct ClaudeCodeHookAdapter: AgentHookAdapter {
     /// The agent name Liova sees.
     public static let agentName = "claude-code"
     /// Longest command shown in an event's detail.
-    public static let maxCommandPreviewLength = 80
-    /// Byte caps that keep a request far below the 64 KiB wire limit whatever the input.
-    static let maxDetailBytes = 2048
-    static let maxSummaryBytes = 16 * 1024
+    public static let maxCommandPreviewLength = AgentHookFields.maxCommandPreviewLength
 
     /// How long Liova may take to answer a permission request.
     public var permissionTimeout: TimeInterval
@@ -52,16 +39,14 @@ public struct ClaudeCodeHookAdapter: Sendable {
 
     /// Adapts one hook input.
     public func adapt(_ input: Data) -> AgentHookAction {
-        let object: [String: Any]
-        do {
-            guard let parsed = try JSONSerialization.jsonObject(with: input) as? [String: Any] else {
-                return .ignore(reason: "Hook input is not a JSON object.")
-            }
-            object = parsed
-        } catch {
-            return .ignore(reason: "Hook input is not valid JSON.")
+        switch AgentHookFields.object(input) {
+        case let .success(object): adapt(object)
+        case let .failure(reason): .ignore(reason: reason.text)
         }
-        return adapt(HookInput(object))
+    }
+
+    public func output(for decision: AgentDecision) -> String? {
+        ClaudeCodeHookOutput.permissionDecision(decision)
     }
 
     func adapt(_ input: HookInput) -> AgentHookAction {
@@ -71,10 +56,10 @@ public struct ClaudeCodeHookAdapter: Sendable {
         guard let event = HookEvent(rawValue: eventName) else {
             return .ignore(reason: "Unhandled hook event '\(eventName)'.")
         }
-        guard let sessionID = Self.sessionID(input) else {
+        guard let sessionID = AgentHookFields.sessionID(input.string("session_id")) else {
             return .ignore(reason: "Missing session_id.")
         }
-        let project = Self.project(input)
+        let project = AgentHookFields.project(fromPath: input.string("cwd"))
         if event == .permissionRequest {
             return permission(input, sessionID: sessionID, project: project)
         }
@@ -90,7 +75,7 @@ public struct ClaudeCodeHookAdapter: Sendable {
             sessionID: sessionID,
             project: project,
             kind: kind,
-            detail: detail.map(Self.detailText).flatMap { $0.isEmpty ? nil : $0 }
+            detail: AgentHookFields.detail(detail)
         ))
     }
 
@@ -124,32 +109,11 @@ public struct ClaudeCodeHookAdapter: Sendable {
         }
     }
 
-    private static func sessionID(_ input: HookInput) -> String? {
-        guard let raw = input.string("session_id") else { return nil }
-        let sessionID = AgentText.truncate(
-            AgentText.singleLine(raw),
-            maxCharacters: LiovaValidation.maxSessionIDLength,
-            maxBytes: 1024
-        )
-        return sessionID.isEmpty ? nil : sessionID
-    }
-
-    private static func project(_ input: HookInput) -> String? {
-        guard let name = input.string("cwd").flatMap(AgentText.lastPathComponent) else { return nil }
-        let project = AgentText.truncate(
-            AgentText.singleLine(name),
-            maxCharacters: LiovaValidation.maxProjectLength,
-            maxBytes: 1024
-        )
-        return project.isEmpty ? nil : project
-    }
-
     private func permission(_ input: HookInput, sessionID: String, project: String?) -> AgentHookAction {
         if let mode = input.string("permission_mode"), Self.silentPermissionModes.contains(mode) {
             return .ignore(reason: "Permission mode '\(mode)' doesn't ask the user.")
         }
-        guard let rawTool = input.string("tool_name"), case let tool = AgentText.singleLine(rawTool), !tool.isEmpty
-        else {
+        guard let tool = AgentHookFields.toolName(input.string("tool_name")) else {
             return .ignore(reason: "PermissionRequest without tool_name.")
         }
         let summary = Self.permissionSummary(tool: tool, input: input.object("tool_input"))
@@ -157,16 +121,9 @@ public struct ClaudeCodeHookAdapter: Sendable {
             agent: Self.agentName,
             sessionID: sessionID,
             project: project,
-            tool: AgentText.truncate(tool, maxCharacters: LiovaValidation.maxAgentNameLength, maxBytes: 512),
-            summary: AgentText.truncate(
-                AgentText.removingControlCharacters(summary).trimmingCharacters(in: .whitespacesAndNewlines),
-                maxCharacters: LiovaValidation.maxSummaryLength,
-                maxBytes: Self.maxSummaryBytes
-            ),
-            timeout: min(
-                max(permissionTimeout, LiovaValidation.agentTimeoutRange.lowerBound),
-                LiovaValidation.agentTimeoutRange.upperBound
-            )
+            tool: tool,
+            summary: AgentHookFields.summary(summary),
+            timeout: AgentHookFields.permissionTimeout(permissionTimeout)
         ))
     }
 
@@ -181,15 +138,7 @@ public struct ClaudeCodeHookAdapter: Sendable {
     static func toolDetail(tool: String, input: HookInput?) -> String {
         switch tool {
         case "Bash":
-            guard let command = input?.string("command").flatMap(AgentText.firstNonBlankLine) else {
-                return "Running a command"
-            }
-            let preview = AgentText.truncate(
-                AgentText.singleLine(command),
-                maxCharacters: maxCommandPreviewLength,
-                maxBytes: 1024
-            )
-            return "Running `\(preview)`"
+            return AgentHookFields.runningDetail(input?.string("command"))
         case _ where fileEditingTools.contains(tool):
             return filePath(input).flatMap(AgentText.lastPathComponent).map { "Editing \($0)" } ?? "Editing a file"
         case "Read":
@@ -230,7 +179,7 @@ public struct ClaudeCodeHookAdapter: Sendable {
         default:
             break
         }
-        return compactJSON(input?.raw) ?? ""
+        return AgentHookFields.compactJSON(input?.raw) ?? ""
     }
 
     /// `server` for an MCP tool named `mcp__server__tool`.
@@ -251,47 +200,5 @@ public struct ClaudeCodeHookAdapter: Sendable {
         }
         // Older Claude Code versions send no type; the idle message is fixed text.
         return input.string("message")?.localizedCaseInsensitiveContains("waiting for your input") == true
-    }
-
-    private static func detailText(_ text: String) -> String {
-        AgentText.truncate(
-            AgentText.singleLine(text),
-            maxCharacters: LiovaValidation.maxDetailLength,
-            maxBytes: maxDetailBytes
-        )
-    }
-
-    /// One line of JSON with sorted keys, or `nil` if there's nothing to show.
-    static func compactJSON(_ value: Any?) -> String? {
-        guard let value, JSONSerialization.isValidJSONObject(value),
-              let data = try? JSONSerialization.data(withJSONObject: value, options: [
-                  .sortedKeys,
-                  .withoutEscapingSlashes,
-              ])
-        else { return nil }
-        return String(data: data, encoding: .utf8)
-    }
-}
-
-/// Typed, forgiving access to a hook's JSON object: wrong types read as missing.
-struct HookInput {
-    let raw: [String: Any]
-
-    init(_ raw: [String: Any]) {
-        self.raw = raw
-    }
-
-    func string(_ key: String) -> String? {
-        raw[key] as? String
-    }
-
-    func bool(_ key: String) -> Bool? {
-        // JSONSerialization represents booleans as NSNumber; only accept real booleans.
-        guard let number = raw[key] as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() else { return nil }
-        return number.boolValue
-    }
-
-    func object(_ key: String) -> HookInput? {
-        (raw[key] as? [String: Any]).map(HookInput.init)
     }
 }

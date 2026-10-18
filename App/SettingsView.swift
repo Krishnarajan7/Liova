@@ -46,6 +46,7 @@ private struct GeneralSettings: View {
                     Text("Main display").tag(DisplayPlacement.mainOnly)
                 }
                 Toggle("Show the notch on displays without a camera housing", isOn: $settings.showVirtualNotchWhenIdle)
+                Toggle("Hide over full-screen apps until hovered", isOn: $settings.hideInFullScreen)
             }
             Section("Interaction") {
                 Toggle("Open on hover", isOn: $settings.openOnHover)
@@ -93,6 +94,22 @@ private struct ActivitySettings: View {
                     "Shows downloads from your browsers (and Telegram, if you turn it on) with progress "
                         + "and speed. Liova only looks at file names and sizes, never their contents. "
                         + "For Telegram, macOS asks once whether Liova may see another app's data."
+                )
+            }
+            Section {
+                Toggle("Calendar: show what's next", isOn: $settings.calendarEnabled)
+            } footer: {
+                Text(
+                    "Your next meeting appears ten minutes before it starts, with a Join button for video calls. "
+                        + "Liova asks for calendar access when you turn this on; events never leave your Mac."
+                )
+            }
+            Section {
+                Toggle("Camera and microphone in use", isOn: $settings.captureIndicatorEnabled)
+            } footer: {
+                Text(
+                    "Flashes the notch when any app turns on the camera or microphone. "
+                        + "Handy in full-screen apps, where the menu bar's indicator is hidden."
                 )
             }
             Section {

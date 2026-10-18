@@ -20,6 +20,11 @@ final class AppCoordinator {
     @ObservationIgnored private let renderers = ActivityRendererRegistry()
     @ObservationIgnored private let chrome = NotchChrome()
     @ObservationIgnored private let systemMonitor = SystemMonitorFeature()
+    @ObservationIgnored private let shelf = ShelfFeature()
+    @ObservationIgnored private lazy var timers = TimerFeature(engine: engine)
+    @ObservationIgnored private lazy var welcome = WelcomeFeature(engine: engine, settings: settings)
+    @ObservationIgnored private lazy var calendar = CalendarFeature(engine: engine, settings: settings)
+    @ObservationIgnored private lazy var capture = CaptureIndicatorFeature(engine: engine, settings: settings)
     @ObservationIgnored private lazy var notchSystem = NotchSystem(
         engine: engine,
         settings: settings,
@@ -60,17 +65,7 @@ final class AppCoordinator {
 
     func start() {
         let interval = Log.signposter.beginInterval("launch")
-        renderers.register(NowPlayingRenderer(feature: nowPlaying), forSource: NowPlayingPolicy.source)
-        renderers.register(HUDRenderer(), forSource: HUDPolicy.source)
-        renderers.register(BatteryRenderer(), forSource: BatteryActivityPolicy.source)
-        renderers.register(DownloadsRenderer(feature: downloads), forSource: DownloadsPolicy.source)
-        hud.sideHUD = { [volumeBar, brightnessBar] state in
-            (state.kind == .brightness ? brightnessBar : volumeBar).show(state)
-        }
-        renderers.register(AgentIslandRenderer(feature: agents), forSource: AgentIslandPolicy.source)
-        agents.onAttentionChange = { [weak self] needed in
-            self?.notchSystem.setAttention(needed)
-        }
+        registerRenderers()
         observeAccessibilityChanges()
         configureChrome()
         notchSystem.start()
@@ -78,20 +73,26 @@ final class AppCoordinator {
         nowPlaying.syncWithSettings()
         hud.syncWithSettings()
         downloads.syncWithSettings()
+        capture.syncWithSettings()
+        calendar.syncWithSettings()
         startPluginServer()
+        showWelcomeIfNeeded()
         settingsObservation = ObservationLoop { [weak self] in
             guard let self else { return }
             // Reading these registers interest; any change reruns the reaction below.
             _ = (
                 settings.displayPlacement,
                 settings.showVirtualNotchWhenIdle,
+                settings.hideInFullScreen,
                 settings.batteryActivitiesEnabled,
                 settings.lowBatteryThreshold,
                 settings.nowPlayingEnabled,
                 settings.hudReplacementEnabled,
                 settings.agentIslandEnabled,
                 settings.downloadsEnabled,
-                settings.telegramDownloadsEnabled
+                settings.telegramDownloadsEnabled,
+                settings.captureIndicatorEnabled,
+                settings.calendarEnabled
             )
         } onChange: { [weak self] in
             self?.notchSystem.settingsDidChange()
@@ -100,6 +101,8 @@ final class AppCoordinator {
             self?.hud.syncWithSettings()
             self?.agents.syncWithSettings()
             self?.downloads.syncWithSettings()
+            self?.capture.syncWithSettings()
+            self?.calendar.syncWithSettings()
         }
         Log.signposter.endInterval("launch", interval)
         Log.app.info("Liova started")
@@ -117,6 +120,9 @@ final class AppCoordinator {
         nowPlaying.stop()
         hud.stop()
         agents.stop()
+        timers.stop()
+        capture.stop()
+        calendar.stop()
         downloads.stop()
         notchSystem.stop()
     }
@@ -134,14 +140,69 @@ final class AppCoordinator {
         }
     }
 
+    /// Custom views for each feature's activities.
+    private func registerRenderers() {
+        renderers.register(NowPlayingRenderer(feature: nowPlaying), forSource: NowPlayingPolicy.source)
+        renderers.register(HUDRenderer(), forSource: HUDPolicy.source)
+        renderers.register(BatteryRenderer(), forSource: BatteryActivityPolicy.source)
+        renderers.register(TimerRenderer(feature: timers), forSource: TimerPolicy.source)
+        renderers.register(CalendarRenderer(feature: calendar), forSource: CalendarPolicy.source)
+        renderers.register(DownloadsRenderer(feature: downloads), forSource: DownloadsPolicy.source)
+        hud.sideHUD = { [volumeBar, brightnessBar] state in
+            (state.kind == .brightness ? brightnessBar : volumeBar).show(state)
+        }
+        renderers.register(AgentIslandRenderer(feature: agents), forSource: AgentIslandPolicy.source)
+        agents.onAttentionChange = { [weak self] needed in
+            self?.notchSystem.setAttention(needed)
+        }
+    }
+
+    /// First launch only: open the notch on a short welcome card.
+    private func showWelcomeIfNeeded() {
+        let openSettings = chrome.openSettings ?? {}
+        renderers.register(
+            WelcomeRenderer(feature: welcome, openSettings: openSettings),
+            forSource: WelcomeFeature.source
+        )
+        guard welcome.showIfNeeded() else { return }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(600)) // after the panels are up
+            self?.notchSystem.setAttention(true)
+            try? await Task.sleep(for: .seconds(12))
+            self?.notchSystem.setAttention(false)
+        }
+    }
+
     /// Pages and status for the open notch.
     private func configureChrome() {
+        let shelf = shelf
+        let timers = timers
         let systemMonitor = systemMonitor
+        chrome.addPage(NotchChrome.Page(id: ShelfFeature.pageID, symbol: "tray.full.fill", title: "Shelf") {
+            AnyView(ShelfPage(feature: shelf))
+        })
+        chrome.addPage(NotchChrome.Page(id: TimerFeature.pageID, symbol: "timer", title: "Timers") {
+            AnyView(TimersPage(feature: timers))
+        })
+        let calendar = calendar
+        let settings = settings
+        chrome.addPage(NotchChrome.Page(
+            id: CalendarFeature.pageID, symbol: "calendar", title: "Calendar",
+            isAvailable: { settings.calendarEnabled },
+            content: { AnyView(CalendarPage(feature: calendar)) }
+        ))
         chrome.addPage(NotchChrome.Page(id: "system", symbol: "gauge.with.dots.needle.67percent", title: "System") {
             AnyView(SystemPage(feature: systemMonitor))
         })
+        chrome.dropPageID = ShelfFeature.pageID
         let battery = battery
-        chrome.trailingStatus = { AnyView(BatteryStatusView(feature: battery)) }
+        let capture = capture
+        chrome.trailingStatus = {
+            AnyView(HStack(spacing: 8) {
+                CaptureStatusView(feature: capture)
+                BatteryStatusView(feature: battery)
+            })
+        }
         chrome.openSettings = {
             NSApp.activate()
             NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)

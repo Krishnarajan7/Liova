@@ -6,7 +6,7 @@ extension CLIHelp {
       liova agents <install|uninstall|status> [agent] [options]
 
     Agent Island shows what your coding agent is doing in the notch, and lets you
-    approve or deny its permission requests from there.
+    approve or deny its permission requests from there (Claude Code and Codex).
 
     SUBCOMMANDS
       install AGENT     Add Liova's hooks to the agent's settings
@@ -14,7 +14,10 @@ extension CLIHelp {
       status [AGENT]    Show whether the hooks are installed and current
 
     AGENTS
-      claude-code       Claude Code (~/.claude/settings.json)
+      claude-code       Claude Code (~/.claude/settings.json), with approvals
+      codex             Codex CLI (~/.codex/hooks.json), with approvals
+      gemini-cli        Gemini CLI (~/.gemini/settings.json), status only
+      cursor            Cursor (~/.cursor/hooks.json), status only
 
     Run 'liova agents <subcommand> --help' for its options.
     Docs: https://github.com/Krishnarajan7/Liova/blob/main/docs/AGENT-ISLAND.md
@@ -22,58 +25,71 @@ extension CLIHelp {
 
     static let agentsInstall = """
     USAGE
-      liova agents install claude-code [--settings PATH] [--dry-run]
+      liova agents install AGENT [--settings PATH] [--dry-run]
 
-    Adds Liova's hooks to Claude Code's user settings, so the notch shows what Claude
-    is doing and you can approve or deny its permission requests there. Run it again
-    after moving Liova; it replaces its own hooks and never duplicates them.
+    Adds Liova's hooks to a coding agent's user settings, so the notch shows what the
+    agent is doing and, for Claude Code and Codex, lets you approve or deny its
+    permission requests there. Run it again after moving Liova; it replaces its own
+    hooks and never duplicates them.
 
     Your other settings and hooks are kept. The previous file is backed up next to it
-    (settings.json.liova-backup-YYYYMMDD-HHMMSS) before anything is written, and a file
-    that isn't valid JSON is never overwritten.
+    (NAME.liova-backup-YYYYMMDD-HHMMSS) before anything is written, and a file that
+    isn't valid JSON is never overwritten.
+
+    AGENTS AND THE FILES THEY USE
+      claude-code       ~/.claude/settings.json
+      codex             ~/.codex/hooks.json (trust the hooks in Codex's /hooks afterwards)
+      gemini-cli        ~/.gemini/settings.json
+      cursor            ~/.cursor/hooks.json
 
     OPTIONS
-      --settings PATH   Settings file to edit (default: ~/.claude/settings.json)
+      --settings PATH   File to edit instead of the agent's default
       --dry-run         Show what would change without writing anything
 
     EXAMPLES
       liova agents install claude-code
-      liova agents install claude-code --dry-run
+      liova agents install codex --dry-run
       liova agents install claude-code --settings ./.claude/settings.json
     """
 
     static let agentsUninstall = """
     USAGE
-      liova agents uninstall claude-code [--settings PATH] [--dry-run]
+      liova agents uninstall AGENT [--settings PATH] [--dry-run]
 
-    Removes Liova's hooks from Claude Code's settings. Other hooks and settings are
-    kept. The previous file is backed up first.
+    Removes Liova's hooks from the agent's settings. Other hooks and settings are
+    kept. The previous file is backed up first. AGENT is claude-code, codex,
+    gemini-cli or cursor.
 
     OPTIONS
-      --settings PATH   Settings file to edit (default: ~/.claude/settings.json)
+      --settings PATH   File to edit instead of the agent's default
       --dry-run         Show what would change without writing anything
     """
 
     static let agentsStatus = """
     USAGE
-      liova agents status [claude-code] [--settings PATH]
+      liova agents status [AGENT [--settings PATH]]
 
     Shows whether Liova's hooks are installed, and whether they point at this copy
-    of liova. Exits with 0 when they are installed and current, 1 otherwise.
+    of liova. Without an agent, lists claude-code, codex, gemini-cli and cursor.
+    Exits with 0 when they are all installed and current, 1 otherwise.
 
     OPTIONS
-      --settings PATH   Settings file to check (default: ~/.claude/settings.json)
+      --settings PATH   File to check instead of the agent's default (needs AGENT)
     """
 
     static let hook = """
     USAGE
-      liova hook claude-code [--timeout DURATION] [--socket PATH]
+      liova hook AGENT [--timeout DURATION] [--socket PATH]
+      liova hook codex [PAYLOAD]
 
     Used by the hooks that 'liova agents install' adds; you don't run it yourself.
-    Reads the agent's hook event on stdin and passes it to Liova. For a permission
-    request it waits for your answer in the notch and prints it for the agent; if
-    Liova isn't running or you don't answer in time, the agent asks in the terminal
-    as usual. It always exits 0 and prints nothing else.
+    AGENT is claude-code, codex, gemini-cli or cursor. Reads the agent's hook event on
+    stdin and passes it to Liova. For a permission request (Claude Code and Codex) it
+    waits for your answer in the notch and prints it for the agent; if Liova isn't
+    running or you don't answer in time, the agent asks as usual. It always exits 0
+    and prints nothing else.
+
+    Codex's older 'notify' setting passes its JSON as an argument (PAYLOAD) instead.
 
     OPTIONS
       --timeout DURATION  How long to wait for an answer to a permission request

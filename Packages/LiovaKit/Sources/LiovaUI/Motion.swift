@@ -11,8 +11,22 @@ import SwiftUI
 /// nothing is ever drawn outside the notch mid-animation.
 public enum Motion {
     public static let open = Animation.spring(response: 0.42, dampingFraction: 1.0)
-    public static let close = Animation.spring(response: 0.45, dampingFraction: 1.0)
+    /// Slightly quicker than open and just shy of critical damping: it settles cleanly without
+    /// the slow tail a fully damped spring has at the end of a close.
+    public static let close = Animation.spring(response: 0.36, dampingFraction: 0.92)
     public static let hover = Animation.spring(response: 0.3, dampingFraction: 0.86)
+
+    /// Items joining or leaving a list (timers, shelf files): lively but settled.
+    public static let list = Animation.spring(response: 0.38, dampingFraction: 0.8)
+
+    /// How list items arrive and leave: they grow in from slightly small and fade, and
+    /// shrink away when removed, so the rest of the list slides to make room.
+    @MainActor public static var listItem: AnyTransition {
+        .asymmetric(
+            insertion: .scale(scale: 0.6).combined(with: .opacity),
+            removal: .scale(scale: 0.6).combined(with: .opacity)
+        )
+    }
 
     /// Content leaving: quick, so it's gone before the shape changes much.
     public static let contentOut = Animation.easeOut(duration: 0.1)

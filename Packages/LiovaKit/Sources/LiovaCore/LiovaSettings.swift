@@ -66,6 +66,26 @@ public final class LiovaSettings {
         didSet { store(hudStyle.rawValue, .hudStyle) }
     }
 
+    /// Keep the notch out of the way over full-screen apps until hovered.
+    public var hideInFullScreen: Bool {
+        didSet { store(hideInFullScreen, .hideInFullScreen) }
+    }
+
+    /// Flash the notch when any app turns on the camera or microphone.
+    public var captureIndicatorEnabled: Bool {
+        didSet { store(captureIndicatorEnabled, .captureIndicatorEnabled) }
+    }
+
+    /// Show the next calendar event. Off by default: it needs calendar access.
+    public var calendarEnabled: Bool {
+        didSet { store(calendarEnabled, .calendarEnabled) }
+    }
+
+    /// Set after the first-launch welcome has been shown.
+    public var hasSeenWelcome: Bool {
+        didSet { store(hasSeenWelcome, .hasSeenWelcome) }
+    }
+
     /// Show what's playing (music, podcasts, video) in the notch.
     public var nowPlayingEnabled: Bool {
         didSet { store(nowPlayingEnabled, .nowPlayingEnabled) }
@@ -108,6 +128,10 @@ public final class LiovaSettings {
         downloadsEnabled = defaults.object(forKey: Key.downloadsEnabled.rawValue) as? Bool ?? true
         telegramDownloadsEnabled = defaults.object(forKey: Key.telegramDownloadsEnabled.rawValue) as? Bool ?? false
         animatedMusicBars = defaults.object(forKey: Key.animatedMusicBars.rawValue) as? Bool ?? true
+        hideInFullScreen = defaults.object(forKey: Key.hideInFullScreen.rawValue) as? Bool ?? true
+        captureIndicatorEnabled = defaults.object(forKey: Key.captureIndicatorEnabled.rawValue) as? Bool ?? true
+        calendarEnabled = defaults.object(forKey: Key.calendarEnabled.rawValue) as? Bool ?? false
+        hasSeenWelcome = defaults.object(forKey: Key.hasSeenWelcome.rawValue) as? Bool ?? false
         hudStyle = defaults.string(forKey: Key.hudStyle.rawValue).flatMap(HUDStyle.init(rawValue:)) ?? .sideBar
         nowPlayingEnabled = defaults.object(forKey: Key.nowPlayingEnabled.rawValue) as? Bool ?? true
         agentIslandEnabled = defaults.object(forKey: Key.agentIslandEnabled.rawValue) as? Bool ?? true
@@ -127,6 +151,10 @@ public final class LiovaSettings {
         case hudReplacementEnabled
         case nowPlayingEnabled
         case hudStyle
+        case hasSeenWelcome
+        case calendarEnabled
+        case captureIndicatorEnabled
+        case hideInFullScreen
         case animatedMusicBars
         case downloadsEnabled
         case telegramDownloadsEnabled

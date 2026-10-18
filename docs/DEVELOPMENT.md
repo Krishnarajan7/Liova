@@ -72,6 +72,10 @@ build/cli/liova activity end --id build
 
 The app must be running (`make run`). See [PLUGIN-API.md](PLUGIN-API.md) for every command and the raw socket protocol.
 
+## Apple Silicon and Intel
+
+Release builds of the app and `make cli` are universal (arm64 + x86_64). On an Apple Silicon Mac, `make test-intel` runs the whole test suite as Intel code under Rosetta. Hardware-specific paths (brightness, GPU statistics) still deserve a check on a real Intel Mac before a release.
+
 ## Repo layout
 
 ```

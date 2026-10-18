@@ -12,16 +12,17 @@ struct NotchRootView: View {
 
     var body: some View {
         let hasActivity = engine.current != nil
+        let isExpanded = model.presentation == .expanded
         let spec = NotchLayout.spec(for: model.presentation, geometry: model.geometry, hasActivity: hasActivity)
-        let hidden = !model.geometry.hasHardwareNotch && !model.showsIdleVirtualNotch
-            && model.presentation == .closed && !hasActivity
+        let idleVirtual = !model.geometry.hasHardwareNotch && !model.showsIdleVirtualNotch && !hasActivity
+        let hidden = model.presentation == .closed && (idleVirtual || model.isCoveredByFullScreen)
 
         ZStack(alignment: .top) {
             NotchShape(topRadius: spec.topRadius, bottomRadius: spec.bottomRadius)
                 .fill(.black)
 
-            content(spec: spec)
-                .padding(.horizontal, spec.topRadius)
+            content(isExpanded: isExpanded, compactVisible: !isExpanded && !hidden, hasActivity: hasActivity)
+                .frame(width: spec.shapeWidth, height: spec.height, alignment: .top)
                 .clipShape(NotchShape(topRadius: spec.topRadius, bottomRadius: spec.bottomRadius))
         }
         .frame(width: spec.shapeWidth, height: spec.height)
@@ -29,21 +30,22 @@ struct NotchRootView: View {
         .onTapGesture(perform: onTap)
         .opacity(hidden ? 0 : 1)
         .animation(Motion.open, value: hasActivity)
+        .animation(.easeInOut(duration: 0.25), value: hidden)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .environment(\.colorScheme, .dark)
     }
 
-    @ViewBuilder
-    private func content(spec: NotchSpec) -> some View {
-        switch model.presentation {
-        case .expanded:
-            ExpandedView(model: model, engine: engine, renderers: renderers, chrome: chrome)
-                .transition(.asymmetric(
-                    insertion: .opacity.combined(with: .scale(scale: 0.96, anchor: .top))
-                        .animation(Motion.expandedContentIn),
-                    removal: .opacity.animation(Motion.contentOut)
-                ))
-        case .closed, .peek:
+    /// Both layers can be mounted at once during a transition. Each one's visibility follows
+    /// `isExpanded` through an animation, so reversing direction mid-flight (hover in, out, in)
+    /// continues smoothly from wherever it is instead of restarting an insertion.
+    ///
+    /// Each layer has a **fixed size** (its own state's size) and is centered at the top; the
+    /// animating shape only clips it. Content never reflows while the notch grows or shrinks,
+    /// which is what keeps the motion clean.
+    private func content(isExpanded: Bool, compactVisible: Bool, hasActivity: Bool) -> some View {
+        let expanded = NotchLayout.spec(for: .expanded, geometry: model.geometry, hasActivity: hasActivity)
+        let compact = NotchLayout.spec(for: .closed, geometry: model.geometry, hasActivity: hasActivity)
+        return ZStack(alignment: .top) {
             if let activity = engine.current {
                 CompactView(
                     activity: activity,
@@ -51,16 +53,33 @@ struct NotchRootView: View {
                     notchWidth: model.geometry.notchSize.width,
                     earWidth: NotchLayout.earWidth(for: model.geometry)
                 )
-                .frame(height: model.geometry.notchSize.height)
-                .frame(maxHeight: .infinity, alignment: .top)
-                .transition(.asymmetric(
-                    insertion: .opacity.combined(with: .scale(scale: 0.8))
-                        .animation(Motion.compactContentIn),
-                    removal: .opacity.animation(Motion.contentOut)
-                ))
+                .frame(width: compact.bodyWidth, height: model.geometry.notchSize.height)
+                .opacity(isExpanded ? 0 : 1)
+                .scaleEffect(isExpanded ? 0.85 : 1)
+                .animation(isExpanded ? Motion.contentOut : Motion.compactContentIn, value: isExpanded)
+                .environment(\.notchCompactVisible, compactVisible)
+                .transition(.opacity.combined(with: .scale(scale: 0.8)).animation(Motion.compactContentIn))
+            }
+            if model.keepsExpandedContent || isExpanded {
+                ExpandedView(model: model, engine: engine, renderers: renderers, chrome: chrome)
+                    .frame(width: expanded.bodyWidth, height: expanded.height)
+                    .environment(\.notchFileDragActive, model.isFileDragActive)
+                    .opacity(isExpanded ? 1 : 0)
+                    .scaleEffect(isExpanded ? 1 : 0.96, anchor: .top)
+                    .animation(isExpanded ? Motion.expandedContentIn : Motion.contentOut, value: isExpanded)
+                    .allowsHitTesting(isExpanded)
             }
         }
+        .frame(width: max(expanded.shapeWidth, compact.shapeWidth), alignment: .top)
     }
+}
+
+/// Whether the closed notch's compact content is actually visible. Views with motion (the
+/// music bars) pause when it isn't: the notch is open, hidden, or covered by a full-screen app.
+public extension EnvironmentValues {
+    @Entry var notchCompactVisible = true
+    /// Files are being dragged onto the open notch: pages show drop targets.
+    @Entry var notchFileDragActive = false
 }
 
 /// The closed notch with a live activity: an icon in the left ear, status in the right.
