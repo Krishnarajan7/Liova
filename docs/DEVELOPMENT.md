@@ -72,6 +72,12 @@ build/cli/liova activity end --id build
 
 The app must be running (`make run`). See [PLUGIN-API.md](PLUGIN-API.md) for every command and the raw socket protocol.
 
+## Releases and icons
+
+- `make release VERSION=x.y.z` builds the universal DMG; see [DISTRIBUTION.md](DISTRIBUTION.md).
+- `make run` also bundles the CLI into the app, so Settings → Agents can connect agents with one click.
+- The app icon is drawn in code: `swift scripts/icon/make-icon.swift App/Assets.xcassets/AppIcon.appiconset` regenerates every size. The menu bar icon is `App/MenuBarIcon.swift`.
+
 ## Apple Silicon and Intel
 
 Release builds of the app and `make cli` are universal (arm64 + x86_64). On an Apple Silicon Mac, `make test-intel` runs the whole test suite as Intel code under Rosetta. Hardware-specific paths (brightness, GPU statistics) still deserve a check on a real Intel Mac before a release.

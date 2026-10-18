@@ -191,6 +191,7 @@ private struct HUDSettings: View {
 
 private struct AgentSettings: View {
     @Bindable var settings: LiovaSettings
+    @State private var connections = AgentConnections()
 
     var body: some View {
         Form {
@@ -200,31 +201,88 @@ private struct AgentSettings: View {
                     .disabled(!settings.agentIslandEnabled)
             } footer: {
                 Text(
-                    "See what Claude Code is doing and approve or deny its requests from the notch. "
+                    "See what your coding agents are doing and approve or deny requests from the notch. "
                         + "If you don't answer, the agent asks in its terminal as usual."
                 )
             }
-            Section("Set up") {
-                LabeledContent("Claude Code") {
-                    Text("liova agents install claude-code")
-                        .font(.system(.callout, design: .monospaced))
-                        .textSelection(.enabled)
+            Section {
+                ForEach(AgentConnections.agents) { agent in
+                    AgentRow(agent: agent, connections: connections)
                 }
-                Text("Run this once in Terminal. It adds Liova's hooks to ~/.claude/settings.json and keeps a backup.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Connect your agents")
+            } footer: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(
+                        "Connecting adds Liova's hooks to the agent's settings file and keeps a backup. "
+                            + "Only event types, the project folder name and a short tool summary are shared, "
+                            + "never your prompts."
+                    )
+                    if !connections.isInApplications {
+                        Text(
+                            "Move Liova to your Applications folder before connecting, so the connection keeps working."
+                        )
+                        .foregroundStyle(.orange)
+                    }
+                }
             }
         }
         .formStyle(.grouped)
+        .onAppear { connections.refresh() }
+    }
+}
+
+private struct AgentRow: View {
+    let agent: AgentConnections.Agent
+    let connections: AgentConnections
+
+    var body: some View {
+        let status = connections.statuses[agent.id] ?? .checking
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(agent.name)
+                Text(agent.approvals ? "Status and approvals" : "Status only")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            switch status {
+            case .checking:
+                ProgressView().controlSize(.small)
+            case .connected:
+                Label("Connected", systemImage: "checkmark.circle.fill")
+                    .labelStyle(.titleAndIcon)
+                    .foregroundStyle(.green)
+                    .font(.callout)
+                Button("Disconnect") { connections.disconnect(agent.id) }
+                    .disabled(connections.busy.contains(agent.id))
+            case .connectedElsewhere:
+                Text("Connected (another copy)")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .help("The hooks run a different copy of liova. Update to use this app's.")
+                Button("Update") { connections.connect(agent.id) }
+                    .disabled(connections.busy.contains(agent.id))
+            case .notConnected:
+                Button("Connect") { connections.connect(agent.id) }
+                    .disabled(connections.busy.contains(agent.id))
+            case let .failed(message):
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .lineLimit(2)
+                Button("Retry") { connections.connect(agent.id) }
+            }
+        }
     }
 }
 
 private struct AboutSettings: View {
     var body: some View {
         VStack(spacing: 10) {
-            Image(systemName: "capsule.inset.filled")
-                .font(.system(size: 40))
-                .foregroundStyle(.tint)
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 72, height: 72)
             Text("Liova").font(.title2.bold())
             Text("Version \(Bundle.main.shortVersion)").foregroundStyle(.secondary)
             Text("A free, open-source Dynamic Island for your Mac.")

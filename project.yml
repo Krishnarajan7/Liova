@@ -72,6 +72,8 @@ targets:
       properties:
         CFBundleName: Liova
         CFBundleDisplayName: Liova
+        CFBundleIconFile: AppIcon
+        CFBundleIconName: AppIcon
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationCategoryType: public.app-category.utilities

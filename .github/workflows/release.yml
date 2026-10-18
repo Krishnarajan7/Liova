@@ -1,0 +1,87 @@
+name: Release
+
+# Push a tag like v0.2.0 to build a universal DMG and open a *draft* GitHub Release.
+# Nothing is published until a maintainer reviews the draft and clicks Publish.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to build (e.g. 0.2.0)
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and draft release
+    runs-on: macos-26
+    env:
+      VERSION: ${{ inputs.version || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Normalize version
+        run: echo "VERSION=${VERSION#v}" >> "$GITHUB_ENV"
+
+      - name: Install tools
+        run: brew install xcodegen swiftlint swiftformat
+
+      - name: Run tests
+        run: make test
+
+      # Optional: a stable signing identity keeps users' macOS permissions across updates.
+      # Store a self-signed code-signing certificate as LIOVA_SIGNING_P12 (base64) and
+      # LIOVA_SIGNING_PASSWORD. Without them, the build is signed ad-hoc.
+      - name: Import signing certificate
+        id: signing
+        env:
+          P12: ${{ secrets.LIOVA_SIGNING_P12 }}
+          PASSWORD: ${{ secrets.LIOVA_SIGNING_PASSWORD }}
+        run: |
+          if [ -z "$P12" ]; then
+            echo "identity=-" >> "$GITHUB_OUTPUT"
+            echo "No signing certificate configured; signing ad-hoc."
+            exit 0
+          fi
+          KEYCHAIN="$RUNNER_TEMP/liova.keychain-db"
+          security create-keychain -p liova "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p liova "$KEYCHAIN"
+          echo "$P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k liova "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN" | awk -F'"' 'NR==1{print $2}')
+          echo "identity=$IDENTITY" >> "$GITHUB_OUTPUT"
+
+      - name: Build DMG
+        run: make release VERSION="$VERSION" SIGN_IDENTITY="${{ steps.signing.outputs.identity }}"
+
+      - name: Write release notes
+        run: |
+          SHA=$(cut -d' ' -f1 "build/release/Liova-$VERSION.dmg.sha256")
+          cat > build/release/notes.md <<NOTES
+          ## Install
+
+          1. Download **Liova-$VERSION.dmg** below and drag Liova into Applications.
+          2. Open it. If macOS says it can't verify Liova, open **System Settings → Privacy & Security** and click **Open Anyway**. You only do this once.
+
+          Works on Apple Silicon and Intel Macs running macOS 14 or later.
+
+          SHA-256: \`$SHA\`
+
+          ## What's new
+
+          _Describe the changes here before publishing._
+          NOTES
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v$VERSION" \
+            "build/release/Liova-$VERSION.dmg" "build/release/Liova-$VERSION.dmg.sha256" \
+            --draft --title "Liova $VERSION" --notes-file build/release/notes.md

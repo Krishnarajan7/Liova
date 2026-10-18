@@ -5,8 +5,10 @@ struct LiovaApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        MenuBarExtra("Liova", systemImage: "capsule.inset.filled") {
+        MenuBarExtra {
             MenuContent(coordinator: appDelegate.coordinator)
+        } label: {
+            Image(nsImage: MenuBarIcon.image)
         }
 
         Settings {

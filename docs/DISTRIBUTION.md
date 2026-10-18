@@ -15,19 +15,26 @@ How Liova is built and shipped without a paid Apple Developer account, what user
 
 ## How releases are built
 
-All builds are **ad-hoc signed** (`CODE_SIGN_IDENTITY=-`). Apple Silicon requires every binary to carry a signature, and an ad-hoc signature satisfies that without a certificate. It does not satisfy Gatekeeper, so downloaded copies are blocked until the user approves them once.
+Locally, one command builds a release:
 
-The release workflow (GitHub Actions, triggered by pushing a `v*` tag) does the following:
+```bash
+make release VERSION=0.2.0     # → build/release/Liova-0.2.0.dmg and .sha256
+```
 
-1. Check out the tag, run `make setup`, then build the **Release** configuration with `xcodebuild`, ad-hoc signed, with the hardened runtime enabled.
-2. Run the test suite and performance checks. A failure stops the release.
-3. Package `Liova.app` into `Liova-<version>.dmg` with `hdiutil`, with an `/Applications` shortcut for drag-to-install.
-4. Compute the DMG's SHA-256.
-5. Sign the DMG for Sparkle with the EdDSA private key (see below) and update `appcast.xml`.
-6. Create a GitHub Release with the DMG, the checksum, and release notes that include the first-launch instructions.
-7. Bump the version and checksum in the Homebrew tap.
+It builds the **universal** (Apple Silicon + Intel) Release app, puts the `liova` CLI inside it at `Contents/Helpers/liova` (so Settings can connect agents with one click), re-signs the app, and packages a drag-to-install DMG with an `/Applications` shortcut and an "If Liova won't open" note. It's signed with the local "Liova Development" certificate when present (`make dev-cert`), otherwise ad-hoc.
 
-Anyone can reproduce a release locally from the tag with the same `make` targets, minus the Sparkle signing step.
+On GitHub, pushing a tag runs `.github/workflows/release.yml`:
+
+1. Run the tests; a failure stops the release.
+2. Sign with the certificate in the `LIOVA_SIGNING_P12` / `LIOVA_SIGNING_PASSWORD` secrets if they exist (a stable identity keeps users' macOS permissions across updates), otherwise ad-hoc.
+3. `make release VERSION=<tag>` and compute the SHA-256.
+4. Create a **draft** GitHub Release with the DMG, the checksum and install notes. Nothing is public until a maintainer edits the notes and clicks **Publish**.
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+Not done yet: Sparkle auto-updates (needs the Sparkle dependency, see below) and the Homebrew tap.
 
 ## First launch for users
 

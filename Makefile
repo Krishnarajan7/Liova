@@ -5,6 +5,8 @@ SCHEME        := Liova
 CONFIG        ?= Debug
 DERIVED       := build
 APP           := $(DERIVED)/Build/Products/$(CONFIG)/Liova.app
+# Release CLIs are universal; Debug builds only the current Mac's architecture (faster).
+CLI_ARCHS     := $(if $(filter Release,$(CONFIG)),--arch arm64 --arch x86_64,)
 PACKAGE_DIR   := Packages/LiovaKit
 MRA_SRC       := Vendor/mediaremote-adapter
 MRA_BUILD     := $(DERIVED)/vendor/mra
@@ -14,11 +16,14 @@ MRA_FRAMEWORK := $(MRA_BUILD)/MediaRemoteAdapter.framework
 # Otherwise ad-hoc ("-"). Override with: make run SIGN_IDENTITY="..."
 SIGN_IDENTITY ?= $(shell security find-identity -v -p codesigning 2>/dev/null | grep -q '"Liova Development"' && echo "Liova Development" || echo "-")
 
+# Set VERSION to stamp a release, e.g. `make release VERSION=0.2.0`.
+VERSION       ?=
+
 XCODEBUILD := xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration $(CONFIG) \
 	-derivedDataPath $(DERIVED) -destination 'platform=macOS,arch=$(shell uname -m)' \
-	CODE_SIGN_IDENTITY="$(SIGN_IDENTITY)"
+	CODE_SIGN_IDENTITY="$(SIGN_IDENTITY)" $(if $(VERSION),MARKETING_VERSION=$(VERSION),)
 
-.PHONY: help setup project vendor dev-cert build run cli test test-intel lint format format-check clean
+.PHONY: help setup project vendor dev-cert build bundle-cli release run cli test test-intel lint format format-check clean
 
 help: ## Show this help
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-13s\033[0m %s\n", $$1, $$2}'
@@ -45,7 +50,20 @@ $(MRA_FRAMEWORK): $(shell find $(MRA_SRC) -type f)
 build: project ## Build the app
 	$(XCODEBUILD) build -quiet
 
-run: build ## Build and launch the app (restarts a running copy)
+bundle-cli: ## Put the `liova` CLI inside the built app (Contents/Helpers) and re-sign it
+	swift build --package-path $(PACKAGE_DIR) --product liova -c release $(CLI_ARCHS) --quiet
+	@mkdir -p "$(APP)/Contents/Helpers"
+	@cp "$$(swift build --package-path $(PACKAGE_DIR) -c release $(CLI_ARCHS) --show-bin-path)/liova" "$(APP)/Contents/Helpers/liova"
+	@codesign --force --options runtime -s "$(SIGN_IDENTITY)" "$(APP)/Contents/Helpers/liova"
+	@codesign --force --preserve-metadata=entitlements,requirements,flags,runtime -s "$(SIGN_IDENTITY)" "$(APP)"
+	@codesign --verify --deep --strict "$(APP)" && echo "Bundled liova into $(APP)"
+
+release: ## Build a universal release DMG: make release VERSION=0.2.0
+	@test -n "$(VERSION)" || { echo "Usage: make release VERSION=x.y.z"; exit 2; }
+	$(MAKE) --no-print-directory build bundle-cli CONFIG=Release VERSION=$(VERSION)
+	scripts/release/make-dmg.sh "$(DERIVED)/Build/Products/Release/Liova.app" "$(VERSION)" "$(DERIVED)/release"
+
+run: build bundle-cli ## Build and launch the app (restarts a running copy)
 	-@pkill -x Liova 2>/dev/null; true
 	open "$(APP)"
 

@@ -79,6 +79,9 @@ Also done ahead of schedule:
 - [x] Camera and microphone in-use indicator
 - [x] Agent Island for Codex (status + approve/deny), Gemini CLI and Cursor (status; their hooks can't skip their own prompts)
 - [x] First-launch welcome card
+- [x] App icon and menu bar icon; CLI bundled in the app; one-click agent connections in Settings
+- [x] Release pipeline: `make release` and a tag-triggered workflow that drafts a GitHub Release with a universal DMG
+- [ ] Sparkle auto-updates (pending the dependency decision) and a Homebrew tap
 - [x] Settings window (launch at login, display placement, hover, haptics, battery) and a demo activity in the menu
 - [x] Measured on a Release build: 0.0% CPU idle, 0.17% with music playing, under 25 MB memory
 
