@@ -1,7 +1,7 @@
 import LiovaPluginKit
 import SwiftUI
 
-extension ActivityTint {
+public extension ActivityTint {
     var color: Color {
         switch self {
         case .accent: .accentColor

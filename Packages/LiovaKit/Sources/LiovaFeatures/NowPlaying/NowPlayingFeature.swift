@@ -18,9 +18,9 @@ public final class NowPlayingFeature {
     public private(set) var isRunning = false
 
     /// False when the adapter isn't bundled or keeps failing; the settings UI says so.
-    /// Whether the closed-notch music bars should move (a user preference).
-    public var animatesIndicator: Bool {
-        settings.animatedMusicBars
+    /// When the closed-notch music bars should move (a user preference).
+    public var musicBars: MusicBarsMode {
+        settings.musicBars
     }
 
     public var isAvailable: Bool {
@@ -28,6 +28,8 @@ public final class NowPlayingFeature {
         return (provider as? MediaRemoteAdapterProvider)?.isAvailable ?? true
     }
 
+    /// Told about every change (lyrics follow the track and its position this way).
+    @ObservationIgnored public var onInfoChange: (@MainActor (NowPlayingInfo?) -> Void)?
     @ObservationIgnored private let engine: ActivityEngine
     @ObservationIgnored private let settings: LiovaSettings
     @ObservationIgnored private let provider: (any NowPlayingProviding)?
@@ -75,6 +77,7 @@ public final class NowPlayingFeature {
         info = nil
         artwork = nil
         artworkSource = nil
+        onInfoChange?(nil)
         engine.endAll(source: NowPlayingPolicy.source)
         Log.feature.info("Now Playing stopped")
     }
@@ -121,6 +124,7 @@ public final class NowPlayingFeature {
             info = new
         }
         updateArtwork(for: new)
+        onInfoChange?(new)
 
         let previous = engine.activity(NowPlayingPolicy.activityID)
         guard let activity = NowPlayingPolicy.activity(for: new, previous: previous, now: now()) else {

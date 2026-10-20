@@ -59,11 +59,11 @@ Out of scope:
 These are design commitments, and violating any of them is a bug.
 
 1. **Least privilege.** Each permission is requested only when the feature that needs it is switched on, with the reason shown in the app. Turning a feature off stops using that permission.
-2. **No telemetry, ever.** Liova sends no analytics or usage data. Crash reports are opt-in and stay local unless you choose to share them. Network access is limited to features that obviously need it (update checks, lyrics) and can be disabled.
+2. **No telemetry, ever.** Liova sends no analytics or usage data. Crash reports are opt-in and stay local unless you choose to share them. Network access is limited to features that obviously need it (update checks, lyrics, weather), each off until you turn it on. Weather sends only a picked city's position or the Mac's approximate one, rounded to two decimals (about a kilometre).
 3. **Plugins are out-of-process.** No third-party code runs inside the Liova process. Tier 1 pushes JSON over the socket, tier 2 is a declarative manifest rendered by our own templates, and tier 3 extensions run in their own sandboxed process and must be signed.
 4. **A locked-down socket.** The socket lives in Liova's Application Support folder in a directory with mode `0700`. Every connection's peer UID is checked against the current user, and messages are size-limited and validated against a schema before use.
 5. **No impersonation of Apple.** We never use Apple bundle IDs (`com.apple.*`) or otherwise pretend to be a system component to get access. Now Playing goes through an open, documented bridge.
 6. **No freezing system processes.** We never `SIGSTOP` or otherwise suspend system processes. HUD replacement uses an event tap, with a watchdog that restores normal behaviour if the tap is disabled, and a safe-mode launch flag.
-7. **Private APIs are isolated.** The few private window-server calls we use live in one module, are resolved at runtime, and fall back to public APIs if missing.
+7. **Private APIs are isolated.** The few undocumented APIs we use (headphone battery and noise-control properties on IOBluetooth, in `LiovaProviders/Headphones`) are looked up at runtime, checked before every use, and simply hide that detail if a macOS release removes them.
 8. **Signed updates.** Every update is verified with Sparkle's EdDSA signature. The private key is never committed to the repo.
 9. **Permissive, auditable dependencies.** Small dependency tree, all MIT/BSD/Apache, pinned versions.

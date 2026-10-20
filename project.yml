@@ -44,6 +44,18 @@ targets:
       # Now Playing helper script (BSD-3, see Vendor/mediaremote-adapter/VENDORED.md).
       - path: Vendor/mediaremote-adapter/bin/mediaremote-adapter.pl
         buildPhase: resources
+      # License notices ship inside the app (BSD-3 asks for it in binary distributions);
+      # Settings > About > Licenses shows them. Copied from the originals at build time.
+      - path: LICENSE
+        buildPhase:
+          copyFiles:
+            destination: resources
+            subpath: Licenses/Liova
+      - path: Vendor/mediaremote-adapter/LICENSE
+        buildPhase:
+          copyFiles:
+            destination: resources
+            subpath: Licenses/mediaremote-adapter
     dependencies:
       - package: LiovaKit
         product: LiovaCore
@@ -79,6 +91,9 @@ targets:
         LSApplicationCategoryType: public.app-category.utilities
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         LSUIElement: true
+        NSBluetoothAlwaysUsageDescription: Liova shows your AirPods and other headphones when they connect, with their battery, and lets you switch noise control. It only reads connected audio devices.
+        NSLocationUsageDescription: Liova shows the weather where you are. It asks for your approximate location only while Weather is on, and rounds it to about a kilometre before asking Open-Meteo.
+        NSLocationWhenInUseUsageDescription: Liova shows the weather where you are. It asks for your approximate location only while Weather is on, and rounds it to about a kilometre before asking Open-Meteo.
         NSCalendarsFullAccessUsageDescription: Liova shows your next meeting in the notch and lists today's events. Events never leave your Mac.
         CFBundleURLTypes:
           - CFBundleURLName: app.liova.Liova
@@ -89,6 +104,8 @@ targets:
       properties:
         # Not sandboxed: a notch app needs window-server access the sandbox forbids.
         com.apple.security.app-sandbox: false
+        # Hardened runtime blocks Location Services without this. Used only for Weather.
+        com.apple.security.personal-information.location: true
 
 schemes:
   Liova:

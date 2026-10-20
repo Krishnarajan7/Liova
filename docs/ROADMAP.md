@@ -47,7 +47,7 @@ A gate is passed only when everything in its row is true.
 - [x] **Day 3–5:** `DisplayManager` keyed by display UUID; notch geometry as a pure struct, tested against values recorded on a MacBook Air M4; one fixed `NSPanel` per display; virtual notch on displays without one.
 - [x] **Day 6–7:** notch `Shape` with animatable radii, the shared springs, event-driven hover with a tested state machine (ADR-012), click-through outside the hot zone, trackpad haptics.
 - [x] **Day 8–10:** activity engine (priority stack with preempt, restore and event-driven expiry); battery activities (charging, on battery, fully charged, low battery) from IOKit push notifications.
-- [ ] **Day 11–12:** performance harness with signposts and an `xctrace` script in CI.
+- [x] **Day 11–12:** performance harness (`make perf`: exact kernel counters, median of runs, budget gate) and a CI job.
 - [x] **Day 13–14:** Now Playing provider on the mediaremote-adapter bridge with diff mode, plus the AppleScript fallback.
 
 Day 1–2 detail:
@@ -85,6 +85,11 @@ Also done ahead of schedule:
 - [x] Settings window (launch at login, display placement, hover, haptics, battery) and a demo activity in the menu
 - [x] Measured on a Release build: 0.0% CPU idle, 0.17% with music playing, under 25 MB memory
 
+- [x] AirPods and Bluetooth headphones: connect and disconnect moments with battery per bud and case, low-battery alert, noise control (Off / Noise Cancellation / Transparency) on a headphones page; wired headphones (USB-C EarPods, USB headsets, the jack) through Core Audio
+- [x] Synced lyrics (opt-in) from lrclib.net, cached, line changes scheduled only while visible
+- [x] Weather (opt-in) from Open-Meteo: page with now, next hours and today's range; rain heads-up; city search or approximate location (rounded); refreshes every 30 min, on wake and when stale
+- [x] Open notch fits its content instead of a fixed height; header status degrades detail by detail instead of wrapping
+- [x] License notices shipped inside the app (Settings > About > Licenses), checked in CI
 - [x] Plugin tier 1: Unix-socket API, `liova` CLI and `liova://` URL scheme, wired into the app and tested end to end ([PLUGIN-API.md](PLUGIN-API.md))
 
 ## How to influence the roadmap

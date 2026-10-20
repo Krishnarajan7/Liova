@@ -67,6 +67,8 @@ struct SnapshotExport {
         }
         .frame(width: size.width, height: size.height)
 
+        // A first pass measures the open notch's content, which then sizes it.
+        _ = ImageRenderer(content: view).nsImage
         let renderer = ImageRenderer(content: view)
         renderer.scale = 2
         let image = try #require(renderer.nsImage)

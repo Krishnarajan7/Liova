@@ -11,6 +11,8 @@ struct ExpandedView: View {
 
     private static let maxQueued = 2
     private static let horizontalPadding: CGFloat = 18
+    private static let headerSpacing: CGFloat = 10
+    private static let bottomPadding: CGFloat = 14
     /// Activities ending within this window are "brief" (a charging flash, a HUD, a finished
     /// agent turn). In the open notch they appear as a chip beside the camera instead of
     /// taking over the main card, so what you opened the notch for stays put.
@@ -23,13 +25,18 @@ struct ExpandedView: View {
 
     var body: some View {
         let brief = engine.activities.first { Self.isBrief($0, now: Date()) }
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Self.headerSpacing) {
             header(brief: brief)
             page
         }
         .padding(.horizontal, Self.horizontalPadding)
-        .padding(.bottom, 14)
+        .padding(.bottom, Self.bottomPadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .environment(\.openNotchPage, OpenNotchPageAction { [model] id in
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.9)) {
+                model.selectedPage = id
+            }
+        })
     }
 
     /// The row beside the camera: pages on the left, status on the right. The middle stays
@@ -38,7 +45,7 @@ struct ExpandedView: View {
         let notch = model.geometry.notchSize
         return HStack(spacing: 0) {
             HStack {
-                if !chrome.visiblePages.isEmpty {
+                if chrome.barPageIDs.count > 1 {
                     PageBar(model: model, chrome: chrome)
                 }
                 Spacer(minLength: 0)
@@ -51,7 +58,10 @@ struct ExpandedView: View {
                     BriefChip(activity: brief)
                         .transition(.opacity.combined(with: .scale(scale: 0.85, anchor: .trailing)))
                 } else if let status = chrome.trailingStatus {
+                    // First claim on the space: otherwise the spacer shares it and a status
+                    // that adapts to its width (ViewThatFits) is offered too little.
                     status()
+                        .layoutPriority(1)
                         .transition(.opacity)
                 }
                 if let openSettings = chrome.openSettings {
@@ -64,18 +74,29 @@ struct ExpandedView: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.9), value: brief?.id)
     }
 
-    @ViewBuilder
+    /// The selected page at its natural height, which the notch fits around: the camera
+    /// row, the page and the bottom margin, and nothing more.
     private var page: some View {
         let selected = chrome.allPageIDs.contains(model.selectedPage) ? model.selectedPage : NotchChrome.homePageID
-        ZStack(alignment: .topLeading) {
-            if selected == NotchChrome.homePageID {
-                HomePage(engine: engine, renderers: renderers)
-                    .transition(Self.pageTransition)
-            } else if let page = chrome.visiblePages.first(where: { $0.id == selected }) {
-                page.content()
-                    .transition(Self.pageTransition)
+        return NaturalHeightLayout {
+            ZStack(alignment: .topLeading) {
+                if selected == NotchChrome.homePageID {
+                    HomePage(engine: engine, renderers: renderers)
+                        .transition(Self.pageTransition)
+                } else if let page = chrome.visiblePages.first(where: { $0.id == selected }) {
+                    page.content()
+                        .transition(Self.pageTransition)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.height.rounded(.up) }, action: { [model] height in
+            // Below the camera row: what the header doesn't already cover, plus the margins.
+            let needed = height + Self.headerSpacing + Self.bottomPadding - 6
+            if model.expandedContentHeight != needed {
+                model.expandedContentHeight = needed
+            }
+        })
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .animation(.spring(response: 0.32, dampingFraction: 0.9), value: selected)
     }
@@ -128,9 +149,10 @@ private struct PageBar: View {
     @Namespace private var highlight
 
     var body: some View {
-        let ids = chrome.allPageIDs
-        // Five icons must still fit left of the camera; tighten a little when there are many.
-        let width: CGFloat = ids.count > 4 ? 22 : 26
+        let ids = chrome.barPageIDs
+        // Every icon must fit left of the camera (about 125 pt on a 14" MacBook): tighten as
+        // pages are turned on.
+        let width: CGFloat = ids.count > 5 ? 19 : ids.count > 4 ? 22 : 26
         HStack(spacing: ids.count > 4 ? 1 : 2) {
             ForEach(ids, id: \.self) { id in
                 let isSelected = model.selectedPage == id
@@ -283,5 +305,20 @@ private struct EmptyState: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
+    }
+}
+
+/// Sizes its content at the height it would like (Spacers collapsed, stacks at their
+/// natural size), up to what's offered. Measures and places in one pass, so nothing is
+/// built twice.
+struct NaturalHeightLayout: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache _: inout ()) -> CGSize {
+        guard let content = subviews.first else { return .zero }
+        let natural = content.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
+        return CGSize(width: proposal.width ?? natural.width, height: min(natural.height, proposal.height ?? .infinity))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal _: ProposedViewSize, subviews: Subviews, cache _: inout ()) {
+        subviews.first?.place(at: bounds.origin, anchor: .topLeading, proposal: ProposedViewSize(bounds.size))
     }
 }

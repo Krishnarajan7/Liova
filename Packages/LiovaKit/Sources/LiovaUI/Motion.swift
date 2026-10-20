@@ -15,6 +15,9 @@ public enum Motion {
     /// the slow tail a fully damped spring has at the end of a close.
     public static let close = Animation.spring(response: 0.36, dampingFraction: 0.92)
     public static let hover = Animation.spring(response: 0.3, dampingFraction: 0.86)
+    /// The open notch growing or shrinking to fit new content (a page switch, lyrics
+    /// appearing): settled, like open, so the edge never bounces past the content.
+    public static let resize = Animation.spring(response: 0.38, dampingFraction: 1.0)
 
     /// Items joining or leaving a list (timers, shelf files): lively but settled.
     public static let list = Animation.spring(response: 0.38, dampingFraction: 0.8)

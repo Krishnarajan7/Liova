@@ -14,17 +14,22 @@ public final class NotchChrome {
         let content: () -> AnyView
         /// Whether the page shows right now (e.g. Calendar only once it's turned on).
         let isAvailable: () -> Bool
+        /// False for pages opened from a status view (with `openNotchPage`) instead of the
+        /// page bar, like the headphones page behind the headphones status.
+        let showsInBar: Bool
 
         public init(
             id: String,
             symbol: String,
             title: String,
+            showsInBar: Bool = true,
             isAvailable: @escaping () -> Bool = { true },
             content: @escaping () -> AnyView
         ) {
             self.id = id
             self.symbol = symbol
             self.title = title
+            self.showsInBar = showsInBar
             self.isAvailable = isAvailable
             self.content = content
         }
@@ -54,4 +59,23 @@ public final class NotchChrome {
     var allPageIDs: [String] {
         [Self.homePageID] + visiblePages.map(\.id)
     }
+
+    /// The pages with an icon in the page bar.
+    var barPageIDs: [String] {
+        [Self.homePageID] + visiblePages.filter(\.showsInBar).map(\.id)
+    }
+}
+
+/// Opens a page of the open notch by ID. Status views use it for pages that aren't in the
+/// page bar.
+public struct OpenNotchPageAction: Sendable {
+    let action: @MainActor @Sendable (String) -> Void
+
+    @MainActor public func callAsFunction(_ pageID: String) {
+        action(pageID)
+    }
+}
+
+public extension EnvironmentValues {
+    @Entry var openNotchPage = OpenNotchPageAction { _ in }
 }

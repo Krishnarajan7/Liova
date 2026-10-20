@@ -19,6 +19,23 @@ struct LiovaSettingsTests {
         #expect(settings.lowBatteryThreshold == 20)
         #expect(!settings.hudReplacementEnabled)
         #expect(settings.nowPlayingEnabled)
+        #expect(settings.musicBars == .pluggedIn)
+    }
+
+    @Test func oldMusicBarsSwitchCarriesOver() {
+        defaults.set(false, forKey: "animatedMusicBars")
+        #expect(LiovaSettings(defaults: defaults).musicBars == .off)
+        defaults.set(true, forKey: "animatedMusicBars")
+        #expect(LiovaSettings(defaults: defaults).musicBars == .always)
+        defaults.set("off", forKey: "musicBars")
+        #expect(LiovaSettings(defaults: defaults).musicBars == .off)
+    }
+
+    @Test func musicBarsRestOnBatteryByDefault() {
+        #expect(MusicBarsMode.pluggedIn.animates(onBattery: false))
+        #expect(!MusicBarsMode.pluggedIn.animates(onBattery: true))
+        #expect(MusicBarsMode.always.animates(onBattery: true))
+        #expect(!MusicBarsMode.off.animates(onBattery: false))
     }
 
     @Test func valuesPersistAcrossInstances() {

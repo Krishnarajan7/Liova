@@ -46,6 +46,31 @@ struct NotchLayoutTests {
         #expect(peek.height < expanded.height)
     }
 
+    @Test func openNotchFitsItsContent() {
+        let full = NotchLayout.spec(for: .expanded, geometry: airM4, hasActivity: false)
+        let oneLine = NotchLayout.spec(for: .expanded, geometry: airM4, hasActivity: false, contentHeight: 80)
+        #expect(oneLine.height == airM4.notchSize.height + 80)
+        #expect(oneLine.bodyWidth == full.bodyWidth)
+        // Never shorter than the minimum, never taller than the panel allows.
+        #expect(NotchLayout.expandedBodyHeight(for: 10) == NotchLayout.minExpandedBodyHeight)
+        #expect(NotchLayout.expandedBodyHeight(for: 900) == NotchLayout.expandedBodySize.height)
+        #expect(NotchLayout.expandedBodyHeight(for: nil) == NotchLayout.expandedBodySize.height)
+        #expect(NotchLayout.expandedBodyHeight(for: 80.2) == 81)
+        // Closed and peek ignore it.
+        #expect(NotchLayout.spec(for: .peek, geometry: airM4, hasActivity: true, contentHeight: 70)
+            == NotchLayout.spec(for: .peek, geometry: airM4, hasActivity: true))
+    }
+
+    @MainActor
+    @Test func fileDragsGetTheFullHeight() {
+        let model = NotchModel(geometry: airM4, showsIdleVirtualNotch: false)
+        #expect(model.fittedContentHeight == nil)
+        model.expandedContentHeight = 80
+        #expect(model.fittedContentHeight == 80)
+        model.isFileDragActive = true
+        #expect(model.fittedContentHeight == nil)
+    }
+
     @Test(arguments: [NotchPresentation.closed, .peek, .expanded], [false, true])
     func everyStateFitsInsideTheFixedPanel(presentation: NotchPresentation, hasActivity: Bool) {
         let panel = NotchLayout.panelSize(for: airM4)

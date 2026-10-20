@@ -2,7 +2,7 @@
 
 # Liova
 
-**The free, open-source Dynamic Island for your Mac.**
+**The free, open-source notch for your Mac, in the style of Dynamic Island.**
 
 Music, charging, volume, your coding agents and anything your scripts want to say, in the notch.
 Native Swift, smooth by design, and it uses no CPU while there's nothing to show.
@@ -28,13 +28,27 @@ Native Swift, smooth by design, and it uses no CPU while there's nothing to show
 <td width="50%" valign="top">
 
 **🎵 Now Playing, from any app**<br>
-Spotify, Apple Music, YouTube in your browser, podcasts. Artwork, play/pause, skip and a scrubber you can drag. Small bars move in the closed notch while music plays.
+Spotify, Apple Music, YouTube in your browser, podcasts. Artwork, play/pause, skip and a scrubber you can drag. Small bars move in the closed notch while music plays. Turn on **synced lyrics** and the words follow the song, line by line.
 
 </td>
 <td width="50%" valign="top">
 
 **🤖 Agent Island**<br>
 See what Claude Code is doing ("Running `swift test`", "Editing App.swift") and approve or deny its requests from the notch. One command to set up. If you ignore it, Claude simply asks in the terminal as usual.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**🎧 AirPods and headphones**<br>
+Connect and the notch shows each bud's and the case's battery; disconnect and it shows them leaving. It warns once when they run low, and on AirPods with noise control you can switch between Off, Noise Cancellation and Transparency from the open notch. Works with other Bluetooth headphones too, and with wired ones: USB-C EarPods, USB headsets and the headphone jack.
+
+</td>
+<td valign="top">
+
+**🎤 Synced lyrics**<br>
+Opt-in. The current line and the next one sit under the player as the song plays, from the free [lrclib.net](https://lrclib.net) database. Only the song's name, artist and length are sent; answers are cached.
 
 </td>
 </tr>
@@ -71,6 +85,7 @@ Browser and Telegram downloads show up with size, speed and time left, then flas
 Also:
 
 - **A File Shelf.** Drag files onto the notch to keep them handy, drag them out into any app, or AirDrop them in one click.
+- **Weather.** Opt-in: the temperature, today's high and low and the next hours in the open notch, plus a heads-up in the closed notch when rain is about to start. Uses a city you pick or your approximate location, rounded to about a kilometre. Data by [Open-Meteo](https://open-meteo.com).
 - **Timers and your calendar.** Start a timer in one tap and watch it count down in the notch; your next meeting appears ten minutes early with a Join button.
 - **Camera and mic alerts.** The notch flashes when any app turns on your camera or microphone, even in full-screen apps.
 - **Stays out of your movie.** Over full-screen apps the notch hides until you hover it, and nothing in it animates.
@@ -132,7 +147,7 @@ Every number and rule is in [PERFORMANCE.md](docs/PERFORMANCE.md).
 
 ## Private and safe by default
 
-- **No telemetry, ever.** Liova makes no network requests of its own.
+- **No telemetry, ever.** Liova makes no network requests of its own, with two opt-in exceptions, both off until you turn them on: synced lyrics, which look up the song's title, artist, album and length on [lrclib.net](https://lrclib.net) and cache the answer on your Mac; and weather, which sends [Open-Meteo](https://open-meteo.com) a city's position or your approximate one, rounded to about a kilometre.
 - **Permissions only when needed.** Each one is asked for only when you turn on the feature that needs it. Accessibility is used solely to read the volume and brightness keys, never what you type.
 - **No private-API tricks that can bite.** Liova never freezes system processes and never pretends to be an Apple app.
 - **Plugins stay outside.** They run in their own processes, and the local socket only accepts your own user account.
@@ -160,7 +175,8 @@ Read more in [ARCHITECTURE.md](docs/ARCHITECTURE.md) and the [decision log](docs
 - [x] File Shelf with AirDrop
 - [x] Agent Island for Codex (with approve/deny), Gemini CLI and Cursor (status)
 - [x] Timers, calendar "Next Up", camera and mic indicator
-- [ ] Focus, AirPods and more live activities
+- [x] AirPods, Bluetooth and wired headphones (battery per bud and case, noise control), synced lyrics, weather
+- [ ] Focus, Caps Lock and more live activities
 - [ ] Signed releases, auto-updates and a Homebrew tap
 - [ ] **v1.0, planned for February 2027**
 
@@ -178,4 +194,4 @@ Contributions are welcome, from bug reports to whole features. Start with [CONTR
 
 [MIT](LICENSE) © 2026 Krishnarajan.
 
-"Dynamic Island" is a trademark of Apple Inc. Liova is not affiliated with or endorsed by Apple.
+"Dynamic Island", "AirPods", "EarPods" and "Mac" are trademarks of Apple Inc., used here only to describe what Liova works with. Liova is not affiliated with or endorsed by Apple. Synced lyrics come from [LRCLIB](https://lrclib.net), a free community database; the lyrics belong to their rights holders, and Liova fetches them on your Mac only when you turn the feature on. Weather data by [Open-Meteo.com](https://open-meteo.com), licensed CC BY 4.0. License notices for everything Liova ships are in Settings > About > Licenses.

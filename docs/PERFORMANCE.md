@@ -8,13 +8,14 @@ Every row is a **release blocker**: if a release build misses one, it doesn't sh
 
 | Metric | Budget | How it's measured |
 | --- | --- | --- |
-| CPU, idle, notch closed | **0.0%** average over 60 s | `xctrace` CPU profiler on Apple Silicon CI runners; median of 5 runs |
+| CPU, idle, notch closed | **0.0%** (under 0.05%) average over 30 s, app + helpers | `make perf`: kernel CPU counters, median of 5 runs, on CI |
+| Wakeups, idle | **≤ 2 per second** | `make perf`, same runs |
 | CPU, music playing, notch closed | **< 0.5%** | Same |
 | CPU, notch expanded with visualizer | **< 4%** | Same |
-| Memory, idle | **< 60 MB** | `footprint` |
+| Memory, idle | **< 60 MB**, app + helpers | `make perf` (physical footprint) |
 | Hover to first animation frame | **< 16 ms** | `os_signpost` interval |
 | Dropped frames per open/close at 120 Hz | **0** hitches longer than 1 frame | Animation Hitches instrument |
-| Cold launch to visible notch | **< 300 ms** | Signpost from `main` to first draw |
+| Cold launch to visible notch | **< 300 ms** | `make perf`: from process start until the notch window is on screen |
 | Energy impact | **"Low"** in Activity Monitor over ~12 hours | Manual check before each release |
 
 "Idle" means nothing is live: no media playing, no activities, notch closed. In that state Liova should do no work at all.
@@ -49,35 +50,46 @@ The motion-level details that make the notch feel right.
 
 ## How we measure
 
-**Measured so far** (Release build, MacBook Air M4, Activity Monitor-equivalent `ps` CPU time over 30 s):
+**Measured so far** (Release build, MacBook Air M4 on battery, `make perf`):
 
-| Scenario | CPU | Memory |
-| --- | --- | --- |
-| Idle, notch closed | 0.0% | 15 MB |
-| Music playing, notch closed, static bars | 0.17% | 17 MB |
-| Music playing, notch closed, moving bars (30 fps) | ~1% (+~7% WindowServer) | 24 MB |
+| Scenario | CPU | Wakeups | Memory (app + helpers) | Launch |
+| --- | --- | --- | --- | --- |
+| Idle, notch closed, 40 s after launch | 0.002% | 0 per second | 20.8 + 9.3 MB | 160–190 ms |
+| First 5 s after launch | 2–10% | 20–100 per second | | |
+
+Earlier `ps`-based numbers (rounded to 0.1%): music playing with static bars 0.17%; with moving bars at 30 fps ~1% plus ~7% WindowServer.
+
+"Helpers" are the Now Playing bridge (`/usr/bin/perl` running the vendored adapter, ~6 MB) and the small guard that ends it when Liova exits (~4 MB, see below).
 
 **Lessons that are now rules:**
 
 - *Continuous animation is expensive, and not in Liova.* Any animation running every frame keeps WindowServer recompositing: measured +7.5% WindowServer CPU at 60 fps, +3.7% at 30 fps and +1.8% at 20 fps, even for a 16 pt meter in a tiny window (window size barely matters). So the music bars use a display link capped at 30 fps plugged in and 20 fps on battery, rest when paused, hidden or in Low Power Mode, and can be turned off. Stepping at 10 Hz was cheaper still but looked choppy. Always measure WindowServer too, not just Liova.
 - *No `drawingGroup()` around the notch.* It moves rendering into the app on every frame of any animation (13% CPU with one looping symbol). Core Animation already composites the shape off-process.
 - *No animated shadows.* A shadow whose radius animates forces an extra offscreen pass per frame; it was the main cause of a hover stutter.
+- *Moving music bars are opt-in on battery.* Because of the WindowServer cost above, the default is **When plugged in**: the bars move on power and rest on battery, and they switch the moment the Mac is plugged in or unplugged. **Always** and **Off** are in Settings.
+- *Never ask the window server on the main thread.* `CGWindowListCopyWindowInfo` copies every window's details; the full-screen check runs it on a background queue, and checks requested meanwhile collapse into one.
+- *Decode big payloads once.* Now Playing artwork arrives as megabytes of base64; it's decoded when it changes, not on every play/pause or position update, and later updates share the same bytes, so comparing them costs nothing.
+- *Show the notch first, start the rest after.* Only what draws at launch runs before the first frame; Now Playing, HUD key tap, downloads, capture, calendar and the plugin socket start one run-loop turn later. Launch went from 287 to 191 ms (median of 7).
+- *Child processes must not outlive Liova.* The Now Playing helper runs under a guard that holds a pipe from Liova; however Liova ends (quit, crash, `kill -9`), the kernel closes the pipe and the guard stops the helper. Before this, every crash or force quit left a 20 MB helper running.
+- *Use exact counters, not `ps`.* `ps` rounds CPU to 0.1% and showed "0.0%" while Liova was really at 0.4% shortly after launch. `make perf` reads `proc_pid_rusage`.
 
 **Signposts.** Key intervals are wrapped in `os_signpost` under the `app.liova.Liova` subsystem: launch to first draw, hover to first frame, open and close animations, activity transitions. They show up in Instruments' Points of Interest and in `xctrace` exports.
 
-**`xctrace` in CI.** The performance job builds a Release configuration, launches Liova, and records with `xctrace`:
+**`make perf`.** Builds Release, then [`scripts/perf/liova-perf.swift`](../scripts/perf/liova-perf.swift) launches Liova several times (with first-run UI off, saved settings untouched), times launch until the notch is on screen, lets it settle, and reads the kernel's counters for Liova and its helpers: CPU time, wakeups, energy and physical footprint. The median is compared with the budget and any miss exits non-zero.
 
 ```sh
-xcrun xctrace record --template 'Time Profiler' --time-limit 60s \
-  --attach Liova --output idle.trace
-xcrun xctrace export --input idle.trace --toc
+make perf                                                    # 5 × 30 s idle runs
+make perf PERF_ARGS="--runs 3 --manual 'play music'"         # waits for you, then measures
+make perf PERF_ARGS="--timeline 40"                          # CPU and wakeups per second after launch
 ```
 
-It runs each scenario (idle, music playing, expanded) five times and compares the median against the budget. A regression fails the PR.
+Don't touch the Mac during an idle run: moving the pointer near the notch or switching apps is real work and shows up in the numbers.
+
+**On CI.** The `Performance budget` job runs `make perf` on every push and PR and writes a table to the job summary. Idle CPU, wakeups and memory use the real budget. Launch uses a 1500 ms limit there because GitHub's virtual machines start apps far slower than a Mac; the 300 ms launch budget is checked on real hardware before each release.
 
 **Animation Hitches.** Locally, profile open/close with the **Animation Hitches** instrument on a 120 Hz display. Any hitch longer than one frame is a bug.
 
-**Memory.** `footprint Liova` after launch and after a few minutes idle.
+**Memory.** `make perf` reports it; `footprint Liova` for a one-off look.
 
 **Energy.** Before each release, leave a Release build running for a working day and check Activity Monitor's Energy tab. It should read "Low".
 

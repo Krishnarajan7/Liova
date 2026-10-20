@@ -11,7 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var originalInstance: NSRunningApplication? = {
         guard let bundleID = Bundle.main.bundleIdentifier else { return nil }
         return NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
-            .filter { $0 != .current }
+            .filter { $0 != .current && !$0.isTerminated }
             .min { ($0.launchDate ?? .distantPast) < ($1.launchDate ?? .distantPast) }
     }()
 

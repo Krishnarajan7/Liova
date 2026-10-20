@@ -8,6 +8,9 @@ import os
 /// impersonates an Apple bundle ID. The stream is push-based: the helper writes a line
 /// only when something changes, so this costs nothing while music plays steadily.
 ///
+/// The helper runs under a small guard (see `helperGuard`) so it can never outlive Liova,
+/// even when Liova crashes or is force quit.
+///
 /// Lines are parsed on a background queue (artwork arrives as large base64 strings) and
 /// results are delivered to the main actor in order. If the helper exits unexpectedly it
 /// is restarted with exponential backoff; after repeated fast failures it gives up and
@@ -49,6 +52,36 @@ public final class MediaRemoteAdapterProvider: NowPlayingProviding {
     /// A run shorter than this counts as a failure for backoff purposes.
     private static let healthyRunDuration: TimeInterval = 10
 
+    /// Runs its arguments as a Perl child and ends that child when Liova goes away.
+    ///
+    /// Liova holds the write end of the guard's stdin. However Liova exits (quit, crash,
+    /// `kill -9`), the kernel closes that pipe, the guard's blocking read returns end of file,
+    /// and it stops the helper: no polling, nothing left running. A plain child would linger
+    /// until its next write failed, which can be never when nothing plays. The guard exits
+    /// with the helper's status, so restarts work exactly as before. It's a separate Perl
+    /// process because the vendored script stays unmodified (see VENDORED.md).
+    nonisolated static let helperGuard = #"""
+    use strict; use warnings; use POSIX ();
+    my $pid;
+    my $status = sub { my $s = shift; ($s & 127) ? 128 + ($s & 127) : $s >> 8 };
+    $SIG{CHLD} = sub { POSIX::_exit($status->($?)) if defined $pid && waitpid($pid, POSIX::WNOHANG()) == $pid };
+    $SIG{$_} = sub { kill 'TERM', $pid if $pid } for qw(TERM INT HUP);
+    $pid = fork() // POSIX::_exit(71);
+    if ($pid == 0) {
+      open(STDIN, '<', '/dev/null');
+      exec { '/usr/bin/perl' } '/usr/bin/perl', @ARGV or POSIX::_exit(127);
+    }
+    while (1) {
+      my $read = sysread(STDIN, my $ignored, 512);
+      last if defined $read && $read == 0;
+      next if !defined $read && $!{EINTR};
+      last unless defined $read;
+    }
+    kill 'TERM', $pid;
+    waitpid($pid, 0);
+    POSIX::_exit($status->($?));
+    """#
+
     public init(location: Location) {
         self.location = location
     }
@@ -81,7 +114,15 @@ public final class MediaRemoteAdapterProvider: NowPlayingProviding {
     // MARK: - Stream lifecycle
 
     private func launchStream() {
-        let arguments = [location.scriptURL.path, location.frameworkURL.path, "stream", "--debounce=50"]
+        let arguments = [
+            "-e",
+            Self.helperGuard,
+            "--",
+            location.scriptURL.path,
+            location.frameworkURL.path,
+            "stream",
+            "--debounce=50",
+        ]
         let startedAt = Date()
         let stream = AdapterStream(executable: perl, arguments: arguments) { [weak self] info in
             self?.onChange?(info)
@@ -138,6 +179,8 @@ public final class MediaRemoteAdapterProvider: NowPlayingProviding {
 private final class AdapterStream: @unchecked Sendable {
     private let process = Process()
     private let output = Pipe()
+    /// Never written; Liova holding it open is what keeps the helper alive (see `helperGuard`).
+    private let lifeline = Pipe()
     private var buffer = Data()
     private var parser = NowPlayingStreamParser()
     private let deliver: @MainActor (NowPlayingInfo?) -> Void
@@ -160,6 +203,7 @@ private final class AdapterStream: @unchecked Sendable {
         process.executableURL = executable
         process.arguments = arguments
         process.standardOutput = output
+        process.standardInput = lifeline
         process.standardError = FileHandle.nullDevice
     }
 
@@ -185,6 +229,7 @@ private final class AdapterStream: @unchecked Sendable {
         if process.isRunning {
             process.terminate()
         }
+        try? lifeline.fileHandleForWriting.close()
     }
 
     private func receive(_ chunk: Data) {

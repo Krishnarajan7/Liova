@@ -25,6 +25,9 @@ final class AppCoordinator {
     @ObservationIgnored private lazy var welcome = WelcomeFeature(engine: engine, settings: settings)
     @ObservationIgnored private lazy var calendar = CalendarFeature(engine: engine, settings: settings)
     @ObservationIgnored private lazy var capture = CaptureIndicatorFeature(engine: engine, settings: settings)
+    @ObservationIgnored private lazy var headphones = HeadphonesFeature(engine: engine, settings: settings)
+    @ObservationIgnored private lazy var lyrics = LyricsFeature(settings: settings)
+    @ObservationIgnored private(set) lazy var weather = WeatherFeature(engine: engine, settings: settings)
     @ObservationIgnored private lazy var notchSystem = NotchSystem(
         engine: engine,
         settings: settings,
@@ -51,6 +54,7 @@ final class AppCoordinator {
     @ObservationIgnored private var ipcServer: IPCServer?
     @ObservationIgnored private var settingsObservation: ObservationLoop?
     @ObservationIgnored private var demoTask: Task<Void, Never>?
+    @ObservationIgnored private var isStopped = false
 
     @ObservationIgnored private var accessibilityObserver: (any NSObjectProtocol)?
     /// Volume on the right edge, brightness on the left.
@@ -66,17 +70,29 @@ final class AppCoordinator {
     func start() {
         let interval = Log.signposter.beginInterval("launch")
         registerRenderers()
-        observeAccessibilityChanges()
         configureChrome()
         notchSystem.start()
         battery.syncWithSettings()
+        showWelcomeIfNeeded()
+        Log.signposter.endInterval("launch", interval)
+        // Everything else waits one run-loop turn, so the notch is on screen first; none of it
+        // draws at launch, and each source delivers its current state as soon as it starts.
+        DispatchQueue.main.async { [weak self] in
+            self?.startBackgroundSources()
+        }
+    }
+
+    private func startBackgroundSources() {
+        guard !isStopped else { return }
+        observeAccessibilityChanges()
         nowPlaying.syncWithSettings()
         hud.syncWithSettings()
         downloads.syncWithSettings()
         capture.syncWithSettings()
+        headphones.syncWithSettings()
         calendar.syncWithSettings()
+        weather.syncWithSettings()
         startPluginServer()
-        showWelcomeIfNeeded()
         settingsObservation = ObservationLoop { [weak self] in
             guard let self else { return }
             // Reading these registers interest; any change reruns the reaction below.
@@ -87,28 +103,36 @@ final class AppCoordinator {
                 settings.batteryActivitiesEnabled,
                 settings.lowBatteryThreshold,
                 settings.nowPlayingEnabled,
+                settings.lyricsEnabled,
                 settings.hudReplacementEnabled,
                 settings.agentIslandEnabled,
                 settings.downloadsEnabled,
                 settings.telegramDownloadsEnabled,
                 settings.captureIndicatorEnabled,
-                settings.calendarEnabled
+                settings.headphonesEnabled,
+                settings.calendarEnabled,
+                settings.weatherEnabled,
+                settings.weatherPlace,
+                settings.rainAlertsEnabled
             )
         } onChange: { [weak self] in
             self?.notchSystem.settingsDidChange()
             self?.battery.syncWithSettings()
             self?.nowPlaying.syncWithSettings()
+            self?.lyrics.syncWithSettings()
             self?.hud.syncWithSettings()
             self?.agents.syncWithSettings()
             self?.downloads.syncWithSettings()
             self?.capture.syncWithSettings()
+            self?.headphones.syncWithSettings()
             self?.calendar.syncWithSettings()
+            self?.weather.syncWithSettings()
         }
-        Log.signposter.endInterval("launch", interval)
         Log.app.info("Liova started")
     }
 
     func stop() {
+        isStopped = true
         demoTask?.cancel()
         ipcServer?.stop()
         ipcServer = nil
@@ -122,7 +146,9 @@ final class AppCoordinator {
         agents.stop()
         timers.stop()
         capture.stop()
+        headphones.stop()
         calendar.stop()
+        weather.stop()
         downloads.stop()
         notchSystem.stop()
     }
@@ -142,16 +168,19 @@ final class AppCoordinator {
 
     /// Custom views for each feature's activities.
     private func registerRenderers() {
-        renderers.register(NowPlayingRenderer(feature: nowPlaying), forSource: NowPlayingPolicy.source)
+        renderers.register(NowPlayingRenderer(feature: nowPlaying, lyrics: lyrics), forSource: NowPlayingPolicy.source)
+        nowPlaying.onInfoChange = { [weak self] info in self?.lyrics.update(info) }
         renderers.register(HUDRenderer(), forSource: HUDPolicy.source)
         renderers.register(BatteryRenderer(), forSource: BatteryActivityPolicy.source)
         renderers.register(TimerRenderer(feature: timers), forSource: TimerPolicy.source)
         renderers.register(CalendarRenderer(feature: calendar), forSource: CalendarPolicy.source)
+        renderers.register(WeatherRenderer(feature: weather), forSource: WeatherPolicy.source)
         renderers.register(DownloadsRenderer(feature: downloads), forSource: DownloadsPolicy.source)
         hud.sideHUD = { [volumeBar, brightnessBar] state in
             (state.kind == .brightness ? brightnessBar : volumeBar).show(state)
         }
         renderers.register(AgentIslandRenderer(feature: agents), forSource: AgentIslandPolicy.source)
+        renderers.register(HeadphonesRenderer(feature: headphones), forSource: HeadphonesPolicy.source)
         agents.onAttentionChange = { [weak self] needed in
             self?.notchSystem.setAttention(needed)
         }
@@ -191,17 +220,26 @@ final class AppCoordinator {
             isAvailable: { settings.calendarEnabled },
             content: { AnyView(CalendarPage(feature: calendar)) }
         ))
+        let weather = weather
+        chrome.addPage(NotchChrome.Page(
+            id: WeatherPolicy.pageID, symbol: "cloud.sun.fill", title: "Weather",
+            isAvailable: { settings.weatherEnabled },
+            content: { AnyView(WeatherPage(feature: weather)) }
+        ))
         chrome.addPage(NotchChrome.Page(id: "system", symbol: "gauge.with.dots.needle.67percent", title: "System") {
             AnyView(SystemPage(feature: systemMonitor))
         })
         chrome.dropPageID = ShelfFeature.pageID
         let battery = battery
         let capture = capture
+        let headphones = headphones
+        chrome.addPage(NotchChrome.Page(
+            id: HeadphonesPolicy.pageID, symbol: "headphones", title: "Headphones", showsInBar: false,
+            isAvailable: { headphones.isConnected },
+            content: { AnyView(HeadphonesPage(feature: headphones)) }
+        ))
         chrome.trailingStatus = {
-            AnyView(HStack(spacing: 8) {
-                CaptureStatusView(feature: capture)
-                BatteryStatusView(feature: battery)
-            })
+            Self.trailingStatus(battery: battery, capture: capture, headphones: headphones)
         }
         chrome.openSettings = {
             NSApp.activate()
@@ -249,7 +287,9 @@ final class AppCoordinator {
             Log.app.error("Plugin socket failed to start: \(String(describing: error), privacy: .public)")
         }
     }
+}
 
+extension AppCoordinator {
     /// A short, self-ending activity so new users can see what Liova does.
     func runDemo() {
         demoTask?.cancel()
@@ -306,5 +346,37 @@ final class ObservationLoop {
                 self.observe()
             }
         }
+    }
+}
+
+private extension AppCoordinator {
+    /// Beside the camera in the open notch. Never squeezed: when everything doesn't fit,
+    /// details drop one at a time (headphones level, charging bolt, battery percentage),
+    /// each still in its tooltip, instead of wrapping.
+    static func trailingStatus(
+        battery: BatteryFeature, capture: CaptureIndicatorFeature, headphones: HeadphonesFeature
+    ) -> AnyView {
+        AnyView(ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                CaptureStatusView(feature: capture)
+                HeadphonesStatusView(feature: headphones)
+                BatteryStatusView(feature: battery)
+            }
+            HStack(spacing: 6) {
+                CaptureStatusView(feature: capture)
+                HeadphonesStatusView(feature: headphones, isCompact: true)
+                BatteryStatusView(feature: battery)
+            }
+            HStack(spacing: 6) {
+                CaptureStatusView(feature: capture)
+                HeadphonesStatusView(feature: headphones, isCompact: true)
+                BatteryStatusView(feature: battery, detail: .percentage)
+            }
+            HStack(spacing: 6) {
+                CaptureStatusView(feature: capture)
+                HeadphonesStatusView(feature: headphones, isCompact: true)
+                BatteryStatusView(feature: battery, detail: .icon)
+            }
+        })
     }
 }

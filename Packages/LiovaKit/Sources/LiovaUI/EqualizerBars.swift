@@ -1,19 +1,23 @@
 import AppKit
 import IOKit.ps
+import LiovaCore
 import SwiftUI
 
 /// A small animated level meter for "music is playing".
 ///
 /// Driven by a display link with continuous motion, capped at 30 fps plugged in and 20 fps
 /// on battery: smooth, at a fraction of the system cost of 60 fps. It runs only while music
-/// plays, the notch is visible and Low Power Mode is off; otherwise the bars rest.
+/// plays, the notch is visible, Low Power Mode is off and `mode` allows it on the current
+/// power source; otherwise the bars rest.
 public struct EqualizerBars: NSViewRepresentable {
     public var isAnimating: Bool
+    public var mode: MusicBarsMode
     public var color: NSColor
     public var barCount: Int
 
-    public init(isAnimating: Bool, color: NSColor, barCount: Int = 4) {
+    public init(isAnimating: Bool, mode: MusicBarsMode = .always, color: NSColor, barCount: Int = 4) {
         self.isAnimating = isAnimating
+        self.mode = mode
         self.color = color
         self.barCount = barCount
     }
@@ -23,7 +27,7 @@ public struct EqualizerBars: NSViewRepresentable {
     }
 
     public func updateNSView(_ view: EqualizerBarsView, context: Context) {
-        view.update(color: color, isAnimating: isAnimating && context.environment.notchCompactVisible)
+        view.update(color: color, isAnimating: isAnimating && context.environment.notchCompactVisible, mode: mode)
     }
 }
 
@@ -44,10 +48,12 @@ public final class EqualizerBarsView: NSView {
 
     private var bars: [CALayer] = []
     private var isAnimating = false
+    private var mode: MusicBarsMode = .always
     private var color: NSColor = .white
     private var link: CADisplayLink?
     private var startTime = CACurrentMediaTime()
     private var observers: [any NSObjectProtocol] = []
+    private var powerSource: CFRunLoopSource?
 
     init(barCount: Int) {
         super.init(frame: .zero)
@@ -76,6 +82,9 @@ public final class EqualizerBarsView: NSView {
     isolated deinit {
         link?.invalidate()
         observers.forEach(NotificationCenter.default.removeObserver)
+        if let powerSource {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), powerSource, .commonModes)
+        }
     }
 
     override public func layout() {
@@ -93,14 +102,35 @@ public final class EqualizerBarsView: NSView {
         CATransaction.commit()
     }
 
-    func update(color: NSColor, isAnimating: Bool) {
+    func update(color: NSColor, isAnimating: Bool, mode: MusicBarsMode) {
         if color != self.color {
             self.color = color
             applyColor()
         }
-        guard isAnimating != self.isAnimating else { return }
+        guard isAnimating != self.isAnimating || mode != self.mode else { return }
         self.isAnimating = isAnimating
+        self.mode = mode
+        watchPowerSource(mode != .off)
         syncAnimation()
+    }
+
+    /// Plugging in or unplugging changes the frame rate, or whether the bars move at all.
+    /// macOS fires this only when the power source state changes, so it costs nothing at rest.
+    private func watchPowerSource(_ watch: Bool) {
+        guard watch != (powerSource != nil) else { return }
+        if let powerSource {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), powerSource, .commonModes)
+            self.powerSource = nil
+            return
+        }
+        let context = Unmanaged.passUnretained(self).toOpaque()
+        guard let source = IOPSNotificationCreateRunLoopSource({ context in
+            guard let context else { return }
+            let view = Unmanaged<EqualizerBarsView>.fromOpaque(context).takeUnretainedValue()
+            MainActor.assumeIsolated { view.syncAnimation() }
+        }, context)?.takeRetainedValue() else { return }
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+        powerSource = source
     }
 
     override public func viewWillMove(toWindow newWindow: NSWindow?) {
@@ -138,17 +168,20 @@ public final class EqualizerBarsView: NSView {
         CATransaction.commit()
     }
 
-    /// Runs the display link only while playing, visible and not in Low Power Mode.
+    /// Runs the display link only while playing, visible, not in Low Power Mode and allowed
+    /// on the current power source.
     private func syncAnimation() {
         let visible = window?.occlusionState.contains(.visible) ?? false
-        let shouldRun = isAnimating && visible && !ProcessInfo.processInfo.isLowPowerModeEnabled
+        let onBattery = Self.isOnBattery
+        let shouldRun = isAnimating && visible && mode.animates(onBattery: onBattery)
+            && !ProcessInfo.processInfo.isLowPowerModeEnabled
         if shouldRun {
             if link == nil {
                 let link = displayLink(target: self, selector: #selector(tick))
                 link.add(to: .main, forMode: .common)
                 self.link = link
             }
-            link?.preferredFrameRateRange = Self.isOnBattery ? Self.batteryFrameRate : Self.pluggedInFrameRate
+            link?.preferredFrameRateRange = onBattery ? Self.batteryFrameRate : Self.pluggedInFrameRate
             link?.isPaused = false
         } else {
             link?.isPaused = true

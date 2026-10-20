@@ -13,7 +13,12 @@ struct NotchRootView: View {
     var body: some View {
         let hasActivity = engine.current != nil
         let isExpanded = model.presentation == .expanded
-        let spec = NotchLayout.spec(for: model.presentation, geometry: model.geometry, hasActivity: hasActivity)
+        let spec = NotchLayout.spec(
+            for: model.presentation,
+            geometry: model.geometry,
+            hasActivity: hasActivity,
+            contentHeight: model.fittedContentHeight
+        )
         let idleVirtual = !model.geometry.hasHardwareNotch && !model.showsIdleVirtualNotch && !hasActivity
         let hidden = model.presentation == .closed && (idleVirtual || model.isCoveredByFullScreen)
 
@@ -30,6 +35,7 @@ struct NotchRootView: View {
         .onTapGesture(perform: onTap)
         .opacity(hidden ? 0 : 1)
         .animation(Motion.open, value: hasActivity)
+        .animation(Motion.resize, value: model.fittedContentHeight)
         .animation(.easeInOut(duration: 0.25), value: hidden)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .environment(\.colorScheme, .dark)
@@ -39,8 +45,9 @@ struct NotchRootView: View {
     /// `isExpanded` through an animation, so reversing direction mid-flight (hover in, out, in)
     /// continues smoothly from wherever it is instead of restarting an insertion.
     ///
-    /// Each layer has a **fixed size** (its own state's size) and is centered at the top; the
-    /// animating shape only clips it. Content never reflows while the notch grows or shrinks,
+    /// Each layer has a **fixed size** (its own state's size, the open one at its tallest)
+    /// and is centered at the top; the animating shape only clips it. Content never reflows while the notch grows or
+    /// shrinks,
     /// which is what keeps the motion clean.
     private func content(isExpanded: Bool, compactVisible: Bool, hasActivity: Bool) -> some View {
         let expanded = NotchLayout.spec(for: .expanded, geometry: model.geometry, hasActivity: hasActivity)

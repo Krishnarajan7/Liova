@@ -2,115 +2,80 @@
 //
 //   swift scripts/icon/make-icon.swift App/Assets.xcassets/AppIcon.appiconset
 //
-// Design: a bold "L" for Liova whose foot is the island: a black Dynamic Island with a live,
-// glowing waveform inside. One rim of light traces the whole letter, cyan to violet to pink,
-// on a deep night-blue tile. Drawn from code so it stays sharp and editable. Follows Apple's
-// macOS icon grid: 1024 canvas, 824 squircle, continuous corners.
+// Design: a hand-lettered "Li" in brush script on warm paper. The pen is heavy on downstrokes
+// and hairline on upstrokes, like real penmanship, and the dot of the "i" is a tiny Dynamic
+// Island. Drawn from code by stamping an angled brush tip along the letter's path, so it's
+// sharp at every size and fully our own (no font). Follows Apple's macOS icon grid:
+// 1024 canvas, 824 squircle, continuous corners.
 import AppKit
 import CoreGraphics
 
 let output = CommandLine.arguments.dropFirst().first ?? "AppIcon.appiconset"
 let space = CGColorSpace(name: CGColorSpace.displayP3)!
 
-func c(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat, _ a: CGFloat = 1) -> CGColor {
+func color(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat, _ a: CGFloat = 1) -> CGColor {
     CGColor(colorSpace: space, components: [r, g, b, a])!
 }
 
-func rr(_ rect: CGRect, _ radius: CGFloat) -> CGPath {
+func roundedRect(_ rect: CGRect, _ radius: CGFloat) -> CGPath {
     NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).cgPath
 }
 
-func grad(_ colors: [CGColor], _ locations: [CGFloat]) -> CGGradient {
-    CGGradient(colorsSpace: space, colors: colors as CFArray, locations: locations)!
+let ink = color(0.05, 0.05, 0.06)
+let paper = color(0.985, 0.98, 0.97)
+
+typealias Segment = (CGPoint, CGPoint, CGPoint, CGPoint)
+
+func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+    CGPoint(x: x, y: y)
 }
 
-func draw(_ ctx: CGContext) {
-    let tile = CGRect(x: 100, y: 100, width: 824, height: 824)
-    let tilePath = rr(tile, 185)
-    ctx.saveGState(); ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 26, color: c(0, 0, 0, 0.4))
-    ctx.addPath(tilePath); ctx.setFillColor(c(0.05, 0.06, 0.14)); ctx.fillPath(); ctx.restoreGState()
-    ctx.saveGState(); ctx.addPath(tilePath); ctx.clip()
-    ctx.drawLinearGradient(
-        grad([c(0.10, 0.11, 0.26), c(0.02, 0.02, 0.06)], [0, 1]),
-        start: CGPoint(x: 512, y: 924),
-        end: CGPoint(x: 512, y: 100),
-        options: []
-    )
-    // Soft glow behind the island.
-    ctx.drawRadialGradient(
-        grad([c(0.60, 0.40, 1.0, 0.45), c(0.60, 0.40, 1.0, 0)], [0, 1]),
-        startCenter: CGPoint(x: 540, y: 390),
-        startRadius: 0,
-        endCenter: CGPoint(x: 540, y: 390),
-        endRadius: 380,
-        options: []
-    )
-    ctx.restoreGState()
+func cubic(_ s: Segment, _ t: CGFloat) -> CGPoint {
+    let u = 1 - t
+    let a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t
+    return point(a * s.0.x + b * s.1.x + c * s.2.x + d * s.3.x, a * s.0.y + b * s.1.y + c * s.2.y + d * s.3.y)
+}
 
-    // The L is one continuous shape: a stem whose left edge flows tangentially into the
-    // island's rounded left end, so there's no seam or bump where they meet.
-    let foot = CGRect(x: 290, y: 290, width: 460, height: 180)
-    let footPath = rr(foot, 90)
-    let stem = CGMutablePath()
-    let stemLeft: CGFloat = 290, stemRight: CGFloat = 418, stemTop: CGFloat = 780, stemBottom: CGFloat = foot.midY
-    stem.move(to: CGPoint(x: stemLeft, y: stemBottom))
-    stem.addLine(to: CGPoint(x: stemLeft, y: stemTop - 64))
-    stem.addArc(
-        center: CGPoint(x: stemLeft + 64, y: stemTop - 64),
-        radius: 64,
-        startAngle: .pi,
-        endAngle: 0,
-        clockwise: true
-    )
-    stem.addLine(to: CGPoint(x: stemRight, y: stemBottom))
-    stem.closeSubpath()
-    let letter = stem.union(footPath)
+func smoothstep(_ x: CGFloat) -> CGFloat {
+    let x = min(max(x, 0), 1)
+    return x * x * (3 - 2 * x)
+}
 
-    // Glow and black body.
-    ctx.saveGState(); ctx.setShadow(offset: CGSize(width: 0, height: -8), blur: 50, color: c(0.62, 0.42, 1.0, 0.7))
-    ctx.addPath(letter); ctx.setFillColor(c(0.0, 0.0, 0.01)); ctx.fillPath(); ctx.restoreGState()
-    // The stem above the island is lit with the gradient.
-    ctx.saveGState(); ctx.addPath(letter); ctx.clip(); ctx.clip(to: CGRect(
-        x: 0,
-        y: foot.maxY,
-        width: 1024,
-        height: 600
-    ))
-    ctx.drawLinearGradient(
-        grad([c(0.40, 0.85, 1.0), c(0.58, 0.50, 1.0)], [0, 1]),
-        start: CGPoint(x: 0, y: stemTop),
-        end: CGPoint(x: 0, y: foot.maxY),
-        options: []
-    )
-    ctx.restoreGState()
-    // One rim tracing the whole letter: cyan at the top, through violet, to pink at the end.
-    ctx.saveGState(); ctx.addPath(letter); ctx.setLineWidth(8); ctx.replacePathWithStrokedPath(); ctx.clip()
-    ctx.drawLinearGradient(
-        grad([c(0.40, 0.85, 1.0), c(0.65, 0.48, 1.0), c(1.0, 0.42, 0.65)], [0, 0.5, 1]),
-        start: CGPoint(x: 290, y: 780),
-        end: CGPoint(x: 750, y: 290),
-        options: []
-    )
-    ctx.restoreGState()
+/// The "Li": a looped capital L flowing straight into the i, as one stroke.
+let letters: [Segment] = [
+    (point(498, 640), point(560, 700), point(640, 790), point(578, 818)), // entry hairline into the top loop
+    (point(578, 818), point(530, 840), point(470, 790), point(470, 720)),
+    (point(470, 720), point(470, 600), point(430, 450), point(400, 350)), // the long stem
+    (point(400, 350), point(385, 300), point(320, 285), point(318, 318)), // bottom loop
+    (point(318, 318), point(316, 350), point(390, 340), point(440, 316)),
+    (point(440, 316), point(500, 290), point(560, 330), point(600, 460)), // rising into the i
+    (point(600, 460), point(610, 400), point(600, 330), point(640, 318)), // the i
+    (point(640, 318), point(680, 306), point(712, 330), point(736, 370)), // exit flick
+]
 
-    // Waveform inside the island.
-    let heights: [CGFloat] = [46, 84, 120, 72, 104, 58]
-    let barWidth: CGFloat = 22, gap: CGFloat = 20
-    let startX: CGFloat = 400
-    for (i, h) in heights.enumerated() {
-        let r = CGRect(x: startX + CGFloat(i) * (barWidth + gap), y: 380 - h / 2, width: barWidth, height: h)
-        ctx.saveGState(); ctx.setShadow(offset: .zero, blur: 16, color: c(0.85, 0.45, 1.0, 0.8))
-        ctx.addPath(rr(r, barWidth / 2)); ctx.clip()
-        ctx.drawLinearGradient(
-            grad([c(0.40, 0.85, 1.0), c(0.75, 0.45, 1.0), c(1.0, 0.45, 0.65)], [0, 0.5, 1]),
-            start: CGPoint(x: startX, y: 0),
-            end: CGPoint(x: startX + 6 * (barWidth + gap), y: 0),
-            options: []
-        )
-        ctx.restoreGState()
+/// Points every `spacing` along the path, with the direction of travel.
+func samples(_ segments: [Segment], spacing: CGFloat = 1.2) -> [(point: CGPoint, tangent: CGVector)] {
+    var dense: [CGPoint] = []
+    for (index, segment) in segments.enumerated() {
+        for step in 0 ... 400 where !(step == 0 && index > 0) {
+            dense.append(cubic(segment, CGFloat(step) / 400))
+        }
     }
-    // Hairline glass edge on the tile.
-    ctx.addPath(tilePath); ctx.setStrokeColor(c(1, 1, 1, 0.08)); ctx.setLineWidth(3); ctx.strokePath()
+    var result: [(CGPoint, CGVector)] = []
+    var carry: CGFloat = 0
+    for index in 1 ..< dense.count {
+        let a = dense[index - 1], b = dense[index]
+        let dx = b.x - a.x, dy = b.y - a.y, length = (dx * dx + dy * dy).squareRoot()
+        guard length > 0 else { continue }
+        var distance = carry
+        while distance < length {
+            let t = distance / length
+            result.append((point(a.x + dx * t, a.y + dy * t), CGVector(dx: dx / length, dy: dy / length)))
+            distance += spacing
+        }
+        carry = distance - length
+    }
+    return result
 }
 
 func render(size: Int) -> CGImage {
@@ -125,28 +90,47 @@ func render(size: Int) -> CGImage {
     )!
     ctx.scaleBy(x: CGFloat(size) / 1024, y: CGFloat(size) / 1024)
     ctx.interpolationQuality = .high
-    draw(ctx)
+
+    // Paper tile with a soft shadow.
+    let tile = roundedRect(CGRect(x: 100, y: 100, width: 824, height: 824), 185)
+    ctx.saveGState()
+    ctx.setShadow(offset: CGSize(width: 0, height: -8), blur: 22, color: color(0, 0, 0, 0.3))
+    ctx.addPath(tile)
+    ctx.setFillColor(paper)
+    ctx.fillPath()
+    ctx.restoreGState()
+
+    // The letters: an angled, slightly flat brush tip stamped along the path. Heavy when the
+    // pen moves down, hairline when it moves up, tapered at both ends.
+    let thick: CGFloat = 62, thin: CGFloat = 14
+    let points = samples(letters)
+    ctx.setFillColor(ink)
+    for (index, sample) in points.enumerated() {
+        let t = CGFloat(index) / CGFloat(max(points.count - 1, 1))
+        let down = max(0, -sample.tangent.dy)
+        var width = thin + (thick - thin) * pow(down, 1.4)
+        width *= 0.35 + 0.65 * smoothstep(t / 0.04) * smoothstep((1 - t) / 0.06)
+        ctx.saveGState()
+        ctx.translateBy(x: sample.point.x, y: sample.point.y)
+        ctx.rotate(by: -0.45)
+        ctx.fillEllipse(in: CGRect(x: -width / 2, y: -width * 0.4, width: width, height: width * 0.8))
+        ctx.restoreGState()
+    }
+
+    // The dot of the i is a tiny Dynamic Island.
+    ctx.addPath(roundedRect(CGRect(x: 560, y: 542, width: 106, height: 36), 18))
+    ctx.fillPath()
     return ctx.makeImage()!
 }
 
 let sizes: [(points: Int, scale: Int)] = [
-    (16, 1),
-    (16, 2),
-    (32, 1),
-    (32, 2),
-    (128, 1),
-    (128, 2),
-    (256, 1),
-    (256, 2),
-    (512, 1),
-    (512, 2),
+    (16, 1), (16, 2), (32, 1), (32, 2), (128, 1), (128, 2), (256, 1), (256, 2), (512, 1), (512, 2),
 ]
 try FileManager.default.createDirectory(atPath: output, withIntermediateDirectories: true)
 var images: [[String: String]] = []
 for (points, scale) in sizes {
-    let pixels = points * scale
     let name = "icon_\(points)x\(points)\(scale == 2 ? "@2x" : "").png"
-    let rep = NSBitmapImageRep(cgImage: render(size: pixels))
+    let rep = NSBitmapImageRep(cgImage: render(size: points * scale))
     try rep.representation(using: .png, properties: [:])!
         .write(to: URL(fileURLWithPath: output).appendingPathComponent(name))
     images.append(["idiom": "mac", "size": "\(points)x\(points)", "scale": "\(scale)x", "filename": name])

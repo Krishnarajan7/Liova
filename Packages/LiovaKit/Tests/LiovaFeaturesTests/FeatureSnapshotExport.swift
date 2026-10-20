@@ -97,6 +97,8 @@ struct FeatureSnapshotExport {
                 SideHUDView(model: model)
             }
             .frame(width: SideHUDController.panelSize.width, height: SideHUDController.panelSize.height)
+            // A first pass measures the open notch's content, which then sizes it.
+            _ = ImageRenderer(content: view).nsImage
             let renderer = ImageRenderer(content: view)
             renderer.scale = 2
             let tiff = try #require(renderer.nsImage?.tiffRepresentation)
@@ -178,6 +180,8 @@ struct FeatureSnapshotExport {
             NotchRootView(model: model, engine: engine, renderers: renderers, chrome: chrome, onTap: {})
         }
         .frame(width: size.width, height: size.height)
+        // A first pass measures the open notch's content, which then sizes it.
+        _ = ImageRenderer(content: view).nsImage
         let renderer = ImageRenderer(content: view)
         renderer.scale = 2
         let tiff = try #require(renderer.nsImage?.tiffRepresentation)
@@ -201,5 +205,109 @@ struct FeatureSnapshotExport {
         context.drawLinearGradient(gradient, start: .zero, end: CGPoint(x: size, y: size), options: [])
         guard let image = context.makeImage() else { return nil }
         return NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
+    }
+}
+
+/// Headphones and weather, kept apart so the suite stays readable.
+extension FeatureSnapshotExport {
+    @Test func headphones() throws {
+        let monitor = FakeHeadphonesMonitor()
+        let feature = HeadphonesFeature(engine: engine, settings: settings, monitor: monitor)
+        renderers.register(HeadphonesRenderer(feature: feature), forSource: HeadphonesPolicy.source)
+        chrome.addPage(NotchChrome.Page(
+            id: HeadphonesPolicy.pageID, symbol: "headphones", title: "Headphones", showsInBar: false,
+            content: { AnyView(HeadphonesPage(feature: feature)) }
+        ))
+        chrome.openSettings = {}
+        chrome.trailingStatus = headerStatus(headphones: feature)
+        feature.syncWithSettings()
+        let earPods = HeadphonesState(id: "wired.x", name: "EarPods", kind: .earPods, isWired: true)
+        monitor.send([earPods])
+        try render("headphones-1-wired-closed", .closed)
+        try render("headphones-2-wired-expanded", .expanded)
+        monitor.send([])
+        try render("headphones-3-unplugged-closed", .closed)
+        monitor.send([HeadphonesState(
+            id: "aa", name: "Krish's AirPods Pro", kind: .airPodsPro,
+            battery: .init(left: 82, right: 78, caseLevel: 45),
+            listeningMode: .noiseCancellation, availableModes: [.off, .noiseCancellation, .transparency]
+        )])
+        try render("headphones-4-airpods-expanded", .expanded)
+        try render("headphones-5-page", .expanded, page: HeadphonesPolicy.pageID)
+        engine.endAll(source: HeadphonesPolicy.source)
+        engine.endAll(source: BatteryActivityPolicy.source)
+        try render("headphones-6-header", .expanded, page: HeadphonesPolicy.pageID)
+    }
+
+    /// The app's header status at 100% on power, beside the given headphones.
+    private func headerStatus(headphones feature: HeadphonesFeature) -> () -> AnyView {
+        let power = FakePowerSource(PowerSnapshot(
+            hasBattery: true,
+            percentage: 100,
+            isPluggedIn: true,
+            isCharging: false
+        ))
+        let battery = BatteryFeature(engine: engine, settings: settings, provider: power)
+        battery.start()
+        return {
+            AnyView(ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    HeadphonesStatusView(feature: feature)
+                    BatteryStatusView(feature: battery)
+                }
+                HStack(spacing: 6) {
+                    HeadphonesStatusView(feature: feature, isCompact: true)
+                    BatteryStatusView(feature: battery)
+                }
+                HStack(spacing: 6) {
+                    HeadphonesStatusView(feature: feature, isCompact: true)
+                    BatteryStatusView(feature: battery, detail: .percentage)
+                }
+                HStack(spacing: 6) {
+                    HeadphonesStatusView(feature: feature, isCompact: true)
+                    BatteryStatusView(feature: battery, detail: .icon)
+                }
+            })
+        }
+    }
+
+    @Test func weather() async throws {
+        let now = Date()
+        let hour = 3600.0
+        let start = (now.timeIntervalSince1970 / hour).rounded(.down) * hour
+        let codes: [WeatherCondition] = [.partlyCloudy, .partlyCloudy, .showers, .rain, .cloudy, .clear]
+        let report = WeatherReport(
+            current: .init(temperature: 28.6, feelsLike: 32.9, condition: .partlyCloudy, humidity: 78),
+            hours: codes.enumerated().map { index, code in
+                .init(
+                    time: Date(timeIntervalSince1970: start + Double(index) * hour),
+                    temperature: 28.6 - Double(index) * 0.7,
+                    condition: code,
+                    precipitationChance: [10, 25, 65, 80, 30, 5][index],
+                    isDay: index < 4
+                )
+            },
+            days: [.init(date: now, high: 31.2, low: 24.3, condition: .showers)],
+            timeZone: .current,
+            fetchedAt: now
+        )
+        settings.weatherEnabled = true
+        settings.weatherPlace = WeatherPlace(name: "Chennai, Tamil Nadu, India", latitude: 13.08, longitude: 80.27)
+        let feature = WeatherFeature(
+            engine: engine, settings: settings, fetcher: FakeWeather(answer: report),
+            location: { FakeLocation(.denied) }
+        )
+        renderers.register(WeatherRenderer(feature: feature), forSource: WeatherPolicy.source)
+        chrome.addPage(NotchChrome.Page(id: WeatherPolicy.pageID, symbol: "cloud.sun.fill", title: "Weather") {
+            AnyView(WeatherPage(feature: feature))
+        })
+        chrome.openSettings = {}
+        feature.syncWithSettings()
+        for _ in 0 ..< 100 where feature.report == nil {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        try render("weather-1-page", .expanded, page: WeatherPolicy.pageID)
+        // Showers at 65% within two hours: the feature has already given its heads-up.
+        try render("weather-2-rain-closed", .closed)
     }
 }

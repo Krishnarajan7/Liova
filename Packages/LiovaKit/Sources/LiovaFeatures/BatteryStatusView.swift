@@ -6,9 +6,21 @@ import SwiftUI
 /// battery actually changes.
 public struct BatteryStatusView: View {
     let feature: BatteryFeature
+    let detail: Detail
 
-    public init(feature: BatteryFeature) {
+    /// How much to show, for when the header is crowded. What's dropped stays in the tooltip.
+    public enum Detail: Sendable {
+        /// Bolt, percentage and battery.
+        case full
+        /// Percentage and battery; green alone says charging.
+        case percentage
+        /// The battery alone.
+        case icon
+    }
+
+    public init(feature: BatteryFeature, detail: Detail = .full) {
         self.feature = feature
+        self.detail = detail
     }
 
     public var body: some View {
@@ -16,22 +28,26 @@ public struct BatteryStatusView: View {
             let charging = snapshot.isPluggedIn
             let color: Color = charging ? .green : snapshot.percentage <= 20 ? .red : .white.opacity(0.85)
             HStack(spacing: 4) {
-                if charging {
+                if charging, detail == .full {
                     Image(systemName: "bolt.fill")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(.green)
                         .transition(.scale.combined(with: .opacity))
                 }
-                Text("\(snapshot.percentage)%")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(color)
-                    .contentTransition(.numericText(value: Double(snapshot.percentage)))
+                if detail != .icon {
+                    Text("\(snapshot.percentage)%")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(color)
+                        .contentTransition(.numericText(value: Double(snapshot.percentage)))
+                        .lineLimit(1)
+                }
                 MiniBattery(level: Double(snapshot.percentage) / 100, color: color)
             }
             .animation(.spring(response: 0.35, dampingFraction: 0.8), value: charging)
             .animation(.easeOut(duration: 0.3), value: snapshot.percentage)
-            .help(charging ? "Charging" : "On battery")
+            .fixedSize()
+            .help("\(snapshot.percentage)%, \(charging ? "charging" : "on battery")")
         }
     }
 }

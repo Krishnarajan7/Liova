@@ -30,8 +30,11 @@ public struct NotchSpec: Equatable, Sendable {
 }
 
 public enum NotchLayout {
-    /// Size of the expanded notch body.
+    /// Size of the expanded notch body at its tallest. It fits its content, so a one-line
+    /// card gets a short notch instead of a slab of empty black.
     public static let expandedBodySize = CGSize(width: 480, height: 124)
+    /// The shortest the open notch gets below the camera row.
+    public static let minExpandedBodyHeight: CGFloat = 64
     /// Room around the expanded notch for its shadow. Part of the fixed panel.
     public static let shadowMargin: CGFloat = 24
     /// How much the notch grows on hover.
@@ -51,10 +54,20 @@ public enum NotchLayout {
         (geometry.notchSize.height * 1.15).rounded()
     }
 
+    /// The open notch's height below the camera row for content needing `contentHeight`:
+    /// that, within the minimum and maximum. Unmeasured content gets the maximum.
+    public static func expandedBodyHeight(for contentHeight: CGFloat?) -> CGFloat {
+        guard let contentHeight else { return expandedBodySize.height }
+        return min(max(contentHeight.rounded(.up), minExpandedBodyHeight), expandedBodySize.height)
+    }
+
+    /// `contentHeight` sizes the open notch to fit (see `expandedBodyHeight(for:)`); other
+    /// presentations ignore it.
     public static func spec(
         for presentation: NotchPresentation,
         geometry: NotchGeometry,
-        hasActivity: Bool
+        hasActivity: Bool,
+        contentHeight: CGFloat? = nil
     ) -> NotchSpec {
         let notch = geometry.notchSize
         let closedRadius = min(notch.height * 0.3, 12)
@@ -74,7 +87,7 @@ public enum NotchLayout {
         case .expanded:
             return NotchSpec(
                 bodyWidth: max(expandedBodySize.width, closedWidth + 40),
-                height: notch.height + expandedBodySize.height,
+                height: notch.height + expandedBodyHeight(for: contentHeight),
                 topRadius: 14,
                 bottomRadius: 28
             )

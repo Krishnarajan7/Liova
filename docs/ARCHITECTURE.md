@@ -78,6 +78,7 @@ The engine is pure logic in `LiovaCore` with no UI dependency, and is unit-teste
 ## Windows: one fixed panel per display
 
 - Each display gets **one `NSPanel`**, sized for the largest expanded state, created once and **never resized or animated**. Panels are keyed by display UUID and reconciled when displays change, not torn down and rebuilt.
+- The open notch **fits its content**. `ExpandedView` lays the page out at its natural height (`NaturalHeightLayout`, one pass), stores it in `NotchModel.expandedContentHeight`, and `NotchLayout.spec` sizes the shape to it, between `minExpandedBodyHeight` and `expandedBodySize.height`. Only the shape moves; the content keeps its full-size frame and is clipped, so nothing reflows. While files are dragged in it stays full height, so drop targets are big.
 - The notch is a SwiftUI `Shape` with animatable radii. Only the content inside the panel animates.
 - The panel sits one level above the status bar (`statusBar + 1`), on every Space including full-screen ones, and never becomes key, so it can't steal focus.
 - **Click-through:** the panel ignores mouse events everywhere except the notch's *hot zone* (the shape plus a few points of slop, including the top edge of the screen). Outside it, clicks go straight to the menu bar and apps underneath.

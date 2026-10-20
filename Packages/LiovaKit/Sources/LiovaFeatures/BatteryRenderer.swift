@@ -122,7 +122,7 @@ private struct BatteryGlyph: View {
 
 /// One streak of light sweeping along the notch: left to right when power arrives,
 /// right to left when it leaves.
-private struct EnergySweep: View {
+struct EnergySweep: View {
     let color: Color
     let reversed: Bool
     @State private var progress = -0.3

@@ -23,7 +23,7 @@ XCODEBUILD := xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration $(
 	-derivedDataPath $(DERIVED) -destination 'platform=macOS,arch=$(shell uname -m)' \
 	CODE_SIGN_IDENTITY="$(SIGN_IDENTITY)" $(if $(VERSION),MARKETING_VERSION=$(VERSION),)
 
-.PHONY: help setup project vendor dev-cert build bundle-cli release run cli test test-intel lint format format-check clean
+.PHONY: help setup project vendor dev-cert build bundle-cli release run perf cli test test-intel lint format format-check clean
 
 help: ## Show this help
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-13s\033[0m %s\n", $$1, $$2}'
@@ -66,6 +66,12 @@ release: ## Build a universal release DMG: make release VERSION=0.2.0
 run: build bundle-cli ## Build and launch the app (restarts a running copy)
 	-@pkill -x Liova 2>/dev/null; true
 	open "$(APP)"
+
+perf: ## Measure a Release build against the performance budget (docs/PERFORMANCE.md)
+	$(MAKE) --no-print-directory build CONFIG=Release
+	@mkdir -p $(DERIVED)
+	swiftc -O scripts/perf/liova-perf.swift -o $(DERIVED)/liova-perf
+	$(DERIVED)/liova-perf "$(DERIVED)/Build/Products/Release/Liova.app" $(PERF_ARGS)
 
 cli: ## Build the `liova` command-line tool (universal: Apple Silicon + Intel) into build/cli/liova
 	swift build --package-path $(PACKAGE_DIR) --product liova -c release --arch arm64 --arch x86_64

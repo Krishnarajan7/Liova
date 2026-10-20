@@ -45,6 +45,47 @@ struct NowPlayingStreamParserTests {
         #expect(info.playbackRate == 0)
     }
 
+    @Test func artworkSurvivesDiffsAndIsDecodedOnce() throws {
+        var parser = NowPlayingStreamParser()
+        guard case let .info(first?) = try parser.consume(fullPayload),
+              case let .info(second?) = try parser
+                  .consume(line(#"{"type":"data","diff":true,"payload":{"elapsedTime":9}}"#)),
+              let firstArtwork = first.artworkData, let secondArtwork = second.artworkData
+        else {
+            Issue.record("expected artwork in both")
+            return
+        }
+        // Same bytes, not a fresh decode: the storage is shared.
+        let firstAddress = firstArtwork.withUnsafeBytes { $0.baseAddress }
+        let secondAddress = secondArtwork.withUnsafeBytes { $0.baseAddress }
+        #expect(firstAddress == secondAddress)
+    }
+
+    @Test func fullPayloadWithoutArtworkClearsIt() throws {
+        var parser = NowPlayingStreamParser()
+        _ = try parser.consume(fullPayload)
+        let output = try parser.consume(line("""
+        {"type":"data","diff":false,"payload":{"bundleIdentifier":"com.apple.Music","title":"Other"}}
+        """))
+        guard case let .info(info?) = output else {
+            Issue.record("expected info")
+            return
+        }
+        #expect(info.artworkData == nil)
+    }
+
+    @Test func fractionalTimestampsParse() throws {
+        var parser = NowPlayingStreamParser()
+        _ = try parser.consume(fullPayload)
+        let output = try parser
+            .consume(line(#"{"type":"data","diff":true,"payload":{"timestamp":"2026-10-17T18:20:58.500Z"}}"#))
+        guard case let .info(info?) = output else {
+            Issue.record("expected info")
+            return
+        }
+        #expect(info.timestamp == Date(timeIntervalSince1970: 1_792_261_258.5))
+    }
+
     @Test func nullInDiffRemovesKey() throws {
         var parser = NowPlayingStreamParser()
         _ = try parser.consume(fullPayload)

@@ -164,7 +164,8 @@ public final class NotchController {
         let spec = NotchLayout.spec(
             for: closing ? .expanded : interaction.presentation,
             geometry: model.geometry,
-            hasActivity: engine.current != nil
+            hasActivity: engine.current != nil,
+            contentHeight: model.fittedContentHeight
         )
         let slop: CGFloat = interaction.presentation == .expanded ? 10 : 4
         return NotchLayout.hotZone(spec, inPanel: panel.frame, slop: slop)

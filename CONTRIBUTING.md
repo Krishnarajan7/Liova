@@ -1,6 +1,6 @@
 # Contributing to Liova
 
-Thanks for helping build Liova, the free, open-source Dynamic Island for your Mac. This guide covers everything you need to get a change merged.
+Thanks for helping build Liova, the free, open-source notch for your Mac. This guide covers everything you need to get a change merged.
 
 - [Getting set up](#getting-set-up)
 - [Branches and pull requests](#branches-and-pull-requests)

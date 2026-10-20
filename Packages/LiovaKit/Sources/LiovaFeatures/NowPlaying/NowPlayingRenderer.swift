@@ -1,4 +1,5 @@
 import LiovaPluginKit
+import LiovaProviders
 import LiovaUI
 import SwiftUI
 
@@ -7,9 +8,11 @@ import SwiftUI
 @MainActor
 public final class NowPlayingRenderer: ActivityRenderer {
     private let feature: NowPlayingFeature
+    private let lyrics: LyricsFeature?
 
-    public init(feature: NowPlayingFeature) {
+    public init(feature: NowPlayingFeature, lyrics: LyricsFeature? = nil) {
         self.feature = feature
+        self.lyrics = lyrics
     }
 
     public func compactLeading(for _: Activity) -> AnyView? {
@@ -21,7 +24,12 @@ public final class NowPlayingRenderer: ActivityRenderer {
     }
 
     public func expanded(for _: Activity) -> AnyView? {
-        AnyView(NowPlayingCard(feature: feature))
+        AnyView(NowPlayingCard(feature: feature, lyrics: lyrics))
+    }
+
+    /// Lyrics take the room the queue of other activities would use.
+    public func expandedNeedsFullHeight(for _: Activity) -> Bool {
+        lyrics?.lyrics != nil
     }
 }
 
@@ -62,7 +70,7 @@ private struct PlayingIndicator: View {
     var body: some View {
         let isPlaying = feature.info?.isPlaying ?? false
         ZStack {
-            EqualizerBars(isAnimating: isPlaying && feature.animatesIndicator, color: .systemPink)
+            EqualizerBars(isAnimating: isPlaying, mode: feature.musicBars, color: .systemPink)
                 .frame(width: 16, height: 13)
                 .opacity(isPlaying ? 1 : 0)
             Image(systemName: "pause.fill")
@@ -76,8 +84,20 @@ private struct PlayingIndicator: View {
 
 private struct NowPlayingCard: View {
     let feature: NowPlayingFeature
+    let lyrics: LyricsFeature?
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            player
+            if let lyrics, let synced = lyrics.lyrics {
+                LyricsLines(feature: lyrics, lyrics: synced)
+                    .transition(.opacity.combined(with: .offset(y: 4)))
+            }
+        }
+        .animation(.easeOut(duration: 0.25), value: lyrics?.lyrics != nil)
+    }
+
+    private var player: some View {
         HStack(spacing: 12) {
             ArtworkView(feature: feature, size: 60, cornerRadius: 10)
             VStack(alignment: .leading, spacing: 2) {
@@ -92,16 +112,60 @@ private struct NowPlayingCard: View {
                 Scrubber(feature: feature)
                     .padding(.top, 6)
             }
-            Controls(feature: feature)
+            Controls(feature: feature, lyrics: lyrics)
         }
+    }
+}
+
+/// The line being sung and the next one. Changes slide up, like karaoke.
+private struct LyricsLines: View {
+    let feature: LyricsFeature
+    let lyrics: SyncedLyrics
+
+    var body: some View {
+        let index = feature.lineIndex
+        let current = index.map { lyrics.lines[$0].text }
+        let nextIndex = (index ?? -1) + 1
+        let next = nextIndex < lyrics.lines.count ? lyrics.lines[nextIndex].text : nil
+        VStack(alignment: .leading, spacing: 2) {
+            line(current, isCurrent: true)
+                .id("current-\(index ?? -1)")
+            line(next, isCurrent: false)
+                .id("next-\(nextIndex)")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .clipped()
+        .animation(.spring(response: 0.38, dampingFraction: 0.9), value: index)
+        .onAppear { feature.viewerAppeared() }
+        .onDisappear { feature.viewerLeft() }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(current ?? ""))
+    }
+
+    private func line(_ text: String?, isCurrent: Bool) -> some View {
+        // An empty line is an instrumental break.
+        let shown = text.map { $0.isEmpty ? "♪" : $0 } ?? " "
+        return Text(shown)
+            .font(.system(size: isCurrent ? 13 : 11, weight: isCurrent ? .semibold : .medium, design: .rounded))
+            .foregroundStyle(.white.opacity(isCurrent ? 0.95 : 0.4))
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
+            .transition(.asymmetric(
+                insertion: .opacity.combined(with: .offset(y: 8)),
+                removal: .opacity.combined(with: .offset(y: -8))
+            ))
     }
 }
 
 private struct Controls: View {
     let feature: NowPlayingFeature
+    let lyrics: LyricsFeature?
 
     var body: some View {
         HStack(spacing: 2) {
+            if let lyrics {
+                LyricsToggle(feature: lyrics)
+            }
             ControlButton(symbol: "backward.fill", size: 14) { feature.previousTrack() }
             ControlButton(symbol: feature.info?.isPlaying == true ? "pause.fill" : "play.fill", size: 20) {
                 feature.togglePlayPause()
@@ -143,10 +207,15 @@ private struct Scrubber: View {
 
     var body: some View {
         let isPlaying = feature.info?.isPlaying ?? false
-        TimelineView(.periodic(from: .now, by: 0.5)) { context in
-            content(at: isPlaying ? context.date : .now)
+        TimelineView(Self.schedule(isPlaying: isPlaying)) { context in
+            content(at: context.date)
         }
         .disabled(feature.info?.duration == nil)
+    }
+
+    /// Ticks only while playing. A paused track's clock doesn't move, so it doesn't redraw.
+    private static func schedule(isPlaying: Bool) -> ScrubberSchedule {
+        ScrubberSchedule(interval: isPlaying ? 0.5 : nil)
     }
 
     private func content(at date: Date) -> some View {
@@ -189,5 +258,60 @@ private struct Scrubber: View {
             .foregroundStyle(.white.opacity(0.5))
         }
         .transaction { $0.animation = nil }
+    }
+}
+
+/// Every `interval` seconds, or one single entry when `interval` is nil.
+private struct ScrubberSchedule: TimelineSchedule {
+    let interval: TimeInterval?
+
+    func entries(from startDate: Date, mode _: Mode) -> AnyIterator<Date> {
+        guard let interval else {
+            var done = false
+            return AnyIterator {
+                defer { done = true }
+                return done ? nil : startDate
+            }
+        }
+        var next = startDate
+        return AnyIterator {
+            defer { next += interval }
+            return next
+        }
+    }
+}
+
+/// Turns lyrics on and off from the player. Dimmed while on but the song has none.
+private struct LyricsToggle: View {
+    let feature: LyricsFeature
+    @State private var isHovered = false
+
+    var body: some View {
+        let isOn = feature.isEnabled
+        let found = feature.lyrics != nil
+        Button {
+            feature.setEnabled(!isOn)
+        } label: {
+            Image(systemName: "quote.bubble.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(isOn ? (found ? Color.pink : .white.opacity(0.45)) : .white.opacity(0.6))
+                .frame(width: 26, height: 32)
+                .background(Circle().fill(.white.opacity(isHovered ? 0.12 : 0)).frame(width: 26, height: 26))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .help(help(isOn: isOn, found: found))
+        .accessibilityLabel(Text("Lyrics"))
+        .accessibilityValue(Text(isOn ? "On" : "Off"))
+    }
+
+    private func help(isOn: Bool, found: Bool) -> String {
+        guard isOn else { return "Show synced lyrics (looks the song up on lrclib.net)" }
+        return switch feature.status {
+        case .loading: "Looking for lyrics…"
+        case .unavailable: "No synced lyrics for this song"
+        default: found ? "Hide lyrics" : "Lyrics are on"
+        }
     }
 }

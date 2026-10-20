@@ -13,6 +13,8 @@ struct SettingsView: View {
                 .tabItem { Label("Activities", systemImage: "bolt.horizontal") }
             HUDSettings(settings: coordinator.settings, hud: coordinator.hud)
                 .tabItem { Label("HUDs", systemImage: "speaker.wave.2") }
+            WeatherSettings(settings: coordinator.settings, weather: coordinator.weather)
+                .tabItem { Label("Weather", systemImage: "cloud.sun") }
             AgentSettings(settings: coordinator.settings)
                 .tabItem { Label("Agents", systemImage: "sparkle") }
             AboutSettings()
@@ -75,8 +77,12 @@ private struct ActivitySettings: View {
         Form {
             Section {
                 Toggle("Now Playing", isOn: $settings.nowPlayingEnabled)
-                Toggle("Animated music bars", isOn: $settings.animatedMusicBars)
-                    .disabled(!settings.nowPlayingEnabled)
+                Picker("Moving music bars", selection: $settings.musicBars) {
+                    Text("Always").tag(MusicBarsMode.always)
+                    Text("When plugged in").tag(MusicBarsMode.pluggedIn)
+                    Text("Off").tag(MusicBarsMode.off)
+                }
+                .disabled(!settings.nowPlayingEnabled)
             } footer: {
                 if nowPlaying.isAvailable {
                     Text("Shows music, podcasts and video from any app, with artwork and controls.")
@@ -84,6 +90,16 @@ private struct ActivitySettings: View {
                     Text("Now Playing isn't available in this build. Run `make vendor` and rebuild.")
                         .foregroundStyle(.orange)
                 }
+            }
+            Section {
+                Toggle("Synced lyrics", isOn: $settings.lyricsEnabled)
+                    .disabled(!settings.nowPlayingEnabled)
+            } footer: {
+                Text(
+                    "Shows the words line by line in the open notch. Looks up the song's title, artist, album "
+                        + "and length on lrclib.net, a free lyrics database, and keeps the answer on your Mac. "
+                        + "Nothing else is sent."
+                )
             }
             Section {
                 Toggle("Downloads", isOn: $settings.downloadsEnabled)
@@ -102,6 +118,16 @@ private struct ActivitySettings: View {
                 Text(
                     "Your next meeting appears ten minutes before it starts, with a Join button for video calls. "
                         + "Liova asks for calendar access when you turn this on; events never leave your Mac."
+                )
+            }
+            Section {
+                Toggle("AirPods and headphones", isOn: $settings.headphonesEnabled)
+            } footer: {
+                Text(
+                    "Shows headphones when they connect, Bluetooth or wired (USB-C EarPods, USB headsets, "
+                        + "the headphone jack), with each bud's and the case's battery, warns when they run low, "
+                        + "and switches noise control on AirPods that have it. "
+                        + "macOS asks for Bluetooth access the first time."
                 )
             }
             Section {
@@ -278,6 +304,8 @@ private struct AgentRow: View {
 }
 
 private struct AboutSettings: View {
+    @State private var showsLicenses = false
+
     var body: some View {
         VStack(spacing: 10) {
             Image(nsImage: NSApp.applicationIconImage)
@@ -285,7 +313,7 @@ private struct AboutSettings: View {
                 .frame(width: 72, height: 72)
             Text("Liova").font(.title2.bold())
             Text("Version \(Bundle.main.shortVersion)").foregroundStyle(.secondary)
-            Text("A free, open-source Dynamic Island for your Mac.")
+            Text("The free, open-source notch for your Mac.")
                 .multilineTextAlignment(.center)
             HStack(spacing: 16) {
                 Link("GitHub", destination: URL(string: "https://github.com/Krishnarajan7/Liova")!)
@@ -296,11 +324,16 @@ private struct AboutSettings: View {
                 )
             }
             .font(.callout)
-            Text("MIT License · No telemetry")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                Text("MIT License · No telemetry ·")
+                Button("Licenses") { showsLicenses = true }
+                    .buttonStyle(.link)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
         .padding(24)
         .frame(maxWidth: .infinity)
+        .sheet(isPresented: $showsLicenses) { LicensesView() }
     }
 }

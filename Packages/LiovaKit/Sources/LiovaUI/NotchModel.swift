@@ -1,3 +1,4 @@
+import CoreGraphics
 import LiovaCore
 import Observation
 
@@ -20,6 +21,15 @@ public final class NotchModel {
     public internal(set) var isCoveredByFullScreen = false
     /// Files are being dragged toward the notch; pages can show drop targets.
     public internal(set) var isFileDragActive = false
+    /// How much of the open notch below the camera row its content needs, as last measured.
+    /// The open notch fits around it; nil (not measured yet) means full height.
+    public internal(set) var expandedContentHeight: CGFloat?
+
+    /// What the open notch should fit: full height while files are dragged in, so drop
+    /// targets are big, otherwise the measured content.
+    var fittedContentHeight: CGFloat? {
+        isFileDragActive ? nil : expandedContentHeight
+    }
 
     init(geometry: NotchGeometry, showsIdleVirtualNotch: Bool) {
         self.geometry = geometry

@@ -43,3 +43,36 @@ jobs:
         run: cmake --version
       - name: Build (ad-hoc signed)
         run: make build
+      - name: Privacy usage descriptions are in the app
+        # A missing one makes macOS kill Liova the moment it touches that API.
+        run: |
+          plist=build/Build/Products/Debug/Liova.app/Contents/Info.plist
+          for key in NSBluetoothAlwaysUsageDescription NSCalendarsFullAccessUsageDescription \
+            NSLocationUsageDescription NSLocationWhenInUseUsageDescription; do
+            /usr/libexec/PlistBuddy -c "Print :$key" "$plist" > /dev/null || { echo "Missing $key"; exit 1; }
+          done
+      - name: License notices ship inside the app
+        # BSD-3 (mediaremote-adapter) requires its notice in binary distributions.
+        run: |
+          for name in Liova mediaremote-adapter; do
+            test -s "build/Build/Products/Debug/Liova.app/Contents/Resources/Licenses/$name/LICENSE" \
+              || { echo "Missing license for $name"; exit 1; }
+          done
+
+  performance:
+    name: Performance budget
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Measure idle CPU, wakeups, memory and launch (median of 5)
+        # Runners are virtual machines: idle CPU, wakeups and memory are held to the real
+        # budget; launch gets a looser limit because VMs start apps much slower than Macs.
+        run: make perf PERF_ARGS="--runs 5 --seconds 30 --settle 20 --launch-budget 1500 --json build/perf.json"
+      - name: Keep the measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf
+          path: build/perf.json

@@ -5,8 +5,13 @@ import Foundation
 /// Each line is `{"type":"data","diff":Bool,"payload":{...}}`. A full payload replaces the
 /// state; a diff is merged into it, where a key set to `null` means the key was removed.
 /// An empty payload means nothing is playing. Pure and synchronous, so it's unit-tested.
+///
+/// Artwork (often megabytes of base64) is decoded once, when it arrives, and kept apart from
+/// the other state; later lines share the same bytes, so comparing infos stays cheap.
 public struct NowPlayingStreamParser: Sendable {
     private var state: [String: JSONValue] = [:]
+    private var artwork: Data?
+    private static let artworkKey = "artworkData"
 
     public init() {}
 
@@ -32,18 +37,21 @@ public struct NowPlayingStreamParser: Sendable {
         let isDiff = message["diff"] as? Bool ?? false
         if !isDiff {
             state.removeAll()
+            artwork = nil
         }
         for (key, value) in payload {
-            if value is NSNull {
+            if key == Self.artworkKey {
+                artwork = (value as? String).flatMap { Data(base64Encoded: $0) }
+            } else if value is NSNull {
                 state[key] = nil
             } else if let converted = JSONValue(value) {
                 state[key] = converted
             }
         }
-        return .info(Self.info(from: state))
+        return .info(Self.info(from: state, artwork: artwork))
     }
 
-    static func info(from state: [String: JSONValue]) -> NowPlayingInfo? {
+    static func info(from state: [String: JSONValue], artwork: Data?) -> NowPlayingInfo? {
         guard case let .string(bundle)? = state["bundleIdentifier"],
               case let .string(title)? = state["title"], !title.isEmpty
         else { return nil }
@@ -60,18 +68,15 @@ public struct NowPlayingStreamParser: Sendable {
             timestamp: state["timestamp"]?.string.flatMap(Self.parseDate),
             playbackRate: state["playbackRate"]?.number ?? (isPlaying ? 1 : 0),
             isPlaying: isPlaying,
-            artworkData: state["artworkData"]?.string.flatMap { Data(base64Encoded: $0) }
+            artworkData: artwork
         )
     }
 
+    private static let fractionalDate = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+    private static let wholeSecondDate = Date.ISO8601FormatStyle()
+
     private static func parseDate(_ string: String) -> Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: string) {
-            return date
-        }
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: string)
+        (try? fractionalDate.parse(string)) ?? (try? wholeSecondDate.parse(string))
     }
 }
 

@@ -41,9 +41,15 @@
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Liova shows your AirPods and other headphones when they connect, with their battery, and lets you switch noise control. It only reads connected audio devices.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Liova shows your next meeting in the notch and lists today's events. Events never leave your Mac.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 Krishnarajan. MIT License.</string>
+	<key>NSLocationUsageDescription</key>
+	<string>Liova shows the weather where you are. It asks for your approximate location only while Weather is on, and rounds it to about a kilometre before asking Open-Meteo.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Liova shows the weather where you are. It asks for your approximate location only while Weather is on, and rounds it to about a kilometre before asking Open-Meteo.</string>
 </dict>
 </plist>
