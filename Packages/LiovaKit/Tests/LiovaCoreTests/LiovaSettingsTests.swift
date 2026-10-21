@@ -4,11 +4,10 @@ import Testing
 
 @MainActor
 struct LiovaSettingsTests {
-    let defaults: UserDefaults
+    private let scratch = ScratchDefaults()
 
-    init() throws {
-        let suite = "app.liova.tests.\(UUID().uuidString)"
-        defaults = try #require(UserDefaults(suiteName: suite))
+    var defaults: UserDefaults {
+        scratch.defaults
     }
 
     @Test func defaultsAreSensible() {
@@ -19,7 +18,9 @@ struct LiovaSettingsTests {
         #expect(settings.lowBatteryThreshold == 20)
         #expect(!settings.hudReplacementEnabled)
         #expect(settings.nowPlayingEnabled)
-        #expect(settings.musicBars == .pluggedIn)
+        #expect(settings.musicBars == .always)
+        #expect(!settings.lyricsEnabled)
+        #expect(settings.lyricsInClosedNotch)
     }
 
     @Test func oldMusicBarsSwitchCarriesOver() {
@@ -43,10 +44,12 @@ struct LiovaSettingsTests {
         first.openOnHover = false
         first.displayPlacement = .builtInOnly
         first.hoverDelay = 0.3
+        first.lyricsInClosedNotch = false
         let second = LiovaSettings(defaults: defaults)
         #expect(!second.openOnHover)
         #expect(second.displayPlacement == .builtInOnly)
         #expect(second.hoverDelay == 0.3)
+        #expect(!second.lyricsInClosedNotch)
     }
 
     @Test func outOfRangeValuesAreClamped() {

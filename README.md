@@ -28,7 +28,7 @@ Native Swift, smooth by design, and it uses no CPU while there's nothing to show
 <td width="50%" valign="top">
 
 **🎵 Now Playing, from any app**<br>
-Spotify, Apple Music, YouTube in your browser, podcasts. Artwork, play/pause, skip and a scrubber you can drag. Small bars move in the closed notch while music plays. Turn on **synced lyrics** and the words follow the song, line by line.
+Spotify, Apple Music, YouTube in your browser, podcasts. Artwork, play/pause, skip and a scrubber you can drag. Small bars move in the closed notch while music plays. Turn on **synced lyrics** and the words follow the song, line by line, even with the notch closed.
 
 </td>
 <td width="50%" valign="top">
@@ -48,7 +48,7 @@ Connect and the notch shows each bud's and the case's battery; disconnect and it
 <td valign="top">
 
 **🎤 Synced lyrics**<br>
-Opt-in. The current line and the next one sit under the player as the song plays, from the free [lrclib.net](https://lrclib.net) database. Only the song's name, artist and length are sent; answers are cached.
+Opt-in. The line being sung slides in under the closed notch, and the open player shows it with the next one, from the free [lrclib.net](https://lrclib.net) database. The strip folds away for intros, solos and pauses. Only the song's name, artist and length are sent; answers are cached.
 
 </td>
 </tr>
@@ -147,7 +147,7 @@ Every number and rule is in [PERFORMANCE.md](docs/PERFORMANCE.md).
 
 ## Private and safe by default
 
-- **No telemetry, ever.** Liova makes no network requests of its own, with two opt-in exceptions, both off until you turn them on: synced lyrics, which look up the song's title, artist, album and length on [lrclib.net](https://lrclib.net) and cache the answer on your Mac; and weather, which sends [Open-Meteo](https://open-meteo.com) a city's position or your approximate one, rounded to about a kilometre.
+- **No telemetry, ever.** Once a day Liova asks GitHub whether there's a new version (the request carries only Liova's version; turn it off in Settings → Updates). Beyond that it makes no network requests of its own, with two opt-in exceptions, both off until you turn them on: synced lyrics, which look up the song's title, artist, album and length on [lrclib.net](https://lrclib.net) and cache the answer on your Mac; and weather, which sends [Open-Meteo](https://open-meteo.com) a city's position or your approximate one, rounded to about a kilometre.
 - **Permissions only when needed.** Each one is asked for only when you turn on the feature that needs it. Accessibility is used solely to read the volume and brightness keys, never what you type.
 - **No private-API tricks that can bite.** Liova never freezes system processes and never pretends to be an Apple app.
 - **Plugins stay outside.** They run in their own processes, and the local socket only accepts your own user account.
@@ -177,7 +177,8 @@ Read more in [ARCHITECTURE.md](docs/ARCHITECTURE.md) and the [decision log](docs
 - [x] Timers, calendar "Next Up", camera and mic indicator
 - [x] AirPods, Bluetooth and wired headphones (battery per bud and case, noise control), synced lyrics, weather
 - [ ] Focus, Caps Lock and more live activities
-- [ ] Signed releases, auto-updates and a Homebrew tap
+- [x] One-click updates, installed only when signed with Liova's release certificate
+- [ ] Homebrew tap
 - [ ] **v1.0, planned for February 2027**
 
 The full plan is in [ROADMAP.md](docs/ROADMAP.md).

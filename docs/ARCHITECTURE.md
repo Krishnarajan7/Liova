@@ -102,7 +102,7 @@ First-party features use the same models from `LiovaPluginKit` as third parties,
 
 ### Custom activity views
 
-The notch renders every activity the same way by default: a symbol, a title and optional progress. A feature that needs more (Now Playing's artwork, scrubber and controls) registers an `ActivityRenderer` for its source in the `ActivityRendererRegistry`. The renderer supplies the compact left and right "ears" and the expanded card; anything it returns `nil` for falls back to the defaults. The notch itself never knows about media, so features stay out of `LiovaUI` and the same hook can later serve native plugins.
+The notch renders every activity the same way by default: a symbol, a title and optional progress. A feature that needs more (Now Playing's artwork, scrubber and controls) registers an `ActivityRenderer` for its source in the `ActivityRendererRegistry`. The renderer supplies the compact left and right "ears" and the expanded card; anything it returns `nil` for falls back to the defaults. It can also ask the closed notch to grow a one-line strip under the camera row (`showsCompactDetail` / `compactDetail`; lyrics use it for the line being sung). The shape follows only that yes-or-no answer, so the text inside can change without re-laying out the notch, and the pointer's hot zone grows with it. The notch itself never knows about media, so features stay out of `LiovaUI` and the same hook can later serve native plugins.
 
 ### Open-notch chrome and pages
 
@@ -211,4 +211,4 @@ Things we never do, whatever the benefit: impersonate Apple bundle IDs (`com.app
 
 ## Dependencies
 
-All third-party dependencies are permissively licensed. Planned: Sparkle (MIT), Defaults (MIT), KeyboardShortcuts (MIT), mediaremote-adapter (BSD-3-Clause), swift-collections (Apache-2.0). No GPL anywhere in the tree.
+All third-party dependencies are permissively licensed. Planned: Defaults (MIT), KeyboardShortcuts (MIT), mediaremote-adapter (BSD-3-Clause), swift-collections (Apache-2.0). No GPL anywhere in the tree.

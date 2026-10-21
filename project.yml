@@ -31,6 +31,9 @@ settings:
     Release:
       ARCHS: $(ARCHS_STANDARD)
       ONLY_ACTIVE_ARCH: NO
+      # Xcode adds get-task-allow (lets debuggers attach) when signing without a team;
+      # never in a Release build.
+      CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
 
 targets:
   Liova:

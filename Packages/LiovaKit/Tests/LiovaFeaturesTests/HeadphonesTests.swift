@@ -166,8 +166,10 @@ struct HeadphonesFeatureTests {
         var now = Date(timeIntervalSince1970: 1_800_000_000)
     }
 
+    private let scratch = ScratchDefaults()
+
     init() throws {
-        settings = try LiovaSettings(defaults: #require(UserDefaults(suiteName: "headphones.\(UUID())")))
+        settings = LiovaSettings(defaults: scratch.defaults)
         let clock = clock
         feature = HeadphonesFeature(engine: engine, settings: settings, monitor: monitor, now: { clock.now })
     }

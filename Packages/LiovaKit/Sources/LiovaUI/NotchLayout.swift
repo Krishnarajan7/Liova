@@ -39,6 +39,10 @@ public enum NotchLayout {
     public static let shadowMargin: CGFloat = 24
     /// How much the notch grows on hover.
     public static let peekGrowth = CGSize(width: 16, height: 4)
+    /// The strip a closed notch grows under the camera row for one line of text (the lyric
+    /// being sung): its height, and how much wider than the ears it reaches on each side.
+    public static let compactDetailHeight: CGFloat = 22
+    public static let compactDetailOverhang: CGFloat = 36
 
     /// The fixed panel size for a display: big enough for the largest state, never resized.
     public static func panelSize(for geometry: NotchGeometry) -> CGSize {
@@ -62,17 +66,28 @@ public enum NotchLayout {
     }
 
     /// `contentHeight` sizes the open notch to fit (see `expandedBodyHeight(for:)`); other
-    /// presentations ignore it.
+    /// presentations ignore it. `compactDetail` grows the closed (and peeking) notch by the
+    /// detail strip; it needs an activity, and the open notch ignores it.
     public static func spec(
         for presentation: NotchPresentation,
         geometry: NotchGeometry,
         hasActivity: Bool,
+        compactDetail: Bool = false,
         contentHeight: CGFloat? = nil
     ) -> NotchSpec {
         let notch = geometry.notchSize
         let closedRadius = min(notch.height * 0.3, 12)
         let closedWidth = hasActivity ? notch.width + 2 * earWidth(for: geometry) : notch.width
-        let closed = NotchSpec(bodyWidth: closedWidth, height: notch.height, topRadius: 6, bottomRadius: closedRadius)
+        let closed = if hasActivity, compactDetail {
+            NotchSpec(
+                bodyWidth: closedWidth + 2 * compactDetailOverhang,
+                height: notch.height + compactDetailHeight,
+                topRadius: 6,
+                bottomRadius: min(closedRadius + 6, 16)
+            )
+        } else {
+            NotchSpec(bodyWidth: closedWidth, height: notch.height, topRadius: 6, bottomRadius: closedRadius)
+        }
 
         switch presentation {
         case .closed:

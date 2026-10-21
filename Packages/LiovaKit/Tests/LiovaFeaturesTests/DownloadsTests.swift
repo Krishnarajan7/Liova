@@ -195,8 +195,10 @@ struct DownloadsFeatureTests {
     let settings: LiovaSettings
     let source = FakeDownloads()
 
+    private let scratch = ScratchDefaults()
+
     init() throws {
-        settings = try LiovaSettings(defaults: #require(UserDefaults(suiteName: "app.liova.tests.\(UUID())")))
+        settings = LiovaSettings(defaults: scratch.defaults)
     }
 
     private func makeFeature() -> DownloadsFeature {

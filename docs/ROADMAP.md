@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | **Foundations** | Oct 19 – Nov 1, 2026 | Notch panel, geometry, motion system, activity engine skeleton, CI |
 | **MVP features** | Nov 2 – Dec 13, 2026 | Media, HUDs, battery, shelf, settings |
-| **Alpha** to testers | Dec 14, 2026 | First DMG on GitHub Releases, Sparkle updates working |
+| **Alpha** to testers | Dec 14, 2026 | First DMG on GitHub Releases, in-app updates working |
 | **v1.0 features + performance** | Dec 14, 2026 – Feb 7, 2027 | Live activities, Agent Island, plugin tiers 1–2, budget met |
 | **Beta** on notched Macs | Jan 18 – Feb 7, 2027 | External testers, bug bash |
 | **v1.0 public launch** | **Tue Feb 9, 2027** | Public release with Agent Island |
@@ -23,7 +23,7 @@ A gate is passed only when everything in its row is true.
 | Gate | Must be true before moving on |
 | --- | --- |
 | **Foundations done** | Notch panel works on real and virtual notches; multi-display geometry tests pass; motion system in place; CI green; idle CPU 0.0% |
-| **Alpha** | Media, HUDs, battery, shelf and settings work; ad-hoc signed DMG on GitHub Releases with tested first-launch instructions; Sparkle updates work end to end with EdDSA signatures |
+| **Alpha** | Media, HUDs, battery, shelf and settings work; ad-hoc signed DMG on GitHub Releases with tested first-launch instructions; in-app updates work end to end, signed with the release certificate |
 | **Beta** | Live-activity engine with 8+ activity types; plugin tiers 1 and 2; Agent Island working for at least Claude Code and Codex; every [performance budget](PERFORMANCE.md) met; 3+ testers on notched Macs |
 | **v1.0 launch** | Zero open crash bugs; Agent Island supports Claude Code, Codex, Cursor and Gemini CLI with approve/deny from the notch and one-command setup; README video, comparison table and docs; self-hosted Homebrew tap live; 20+ `good first issue` tickets filed |
 
@@ -39,7 +39,7 @@ A gate is passed only when everything in its row is true.
 | **Extensibility** | `liova` CLI and `liova://` URL scheme | Socket API stable, declarative widgets (tier 2), plugin gallery | ExtensionKit SDK (tier 3), Shortcuts / App Intents, Raycast extension |
 | **AI: Agent Island** | — | **Claude Code, Codex, Cursor and Gemini CLI status, with approve and deny from the notch; one-command hook setup** | More agents, usage meters |
 | **Lock screen** | — | — | Media and timer widgets |
-| **Distribution** | Build from source, ad-hoc signed DMG | Self-hosted Homebrew tap, Sparkle auto-updates | Notarization if an Apple Developer account is obtained |
+| **Distribution** | Build from source, ad-hoc signed DMG | Self-hosted Homebrew tap, in-app updates | Notarization if an Apple Developer account is obtained |
 
 ## First two weeks
 
@@ -81,12 +81,16 @@ Also done ahead of schedule:
 - [x] First-launch welcome card
 - [x] App icon and menu bar icon; CLI bundled in the app; one-click agent connections in Settings
 - [x] Release pipeline: `make release` and a tag-triggered workflow that drafts a GitHub Release with a universal DMG
-- [ ] Sparkle auto-updates (pending the dependency decision) and a Homebrew tap
+- [x] Built-in updates (no dependency): daily check of GitHub releases, a notch heads-up, release notes in Settings, install in place only when signed with the release certificate ([ADR-017](DECISIONS.md#adr-017-built-in-updates-trust-the-release-certificate))
+- [x] Release signing with `codesign` (`scripts/release/sign-app.sh`): hardened runtime, no `get-task-allow`, certificate pinned; one-time `scripts/release/create-release-cert.sh`
+- [x] Music bars move on battery too (20 fps) and heal themselves after sleep or a display change
+- [ ] Homebrew tap
 - [x] Settings window (launch at login, display placement, hover, haptics, battery) and a demo activity in the menu
 - [x] Measured on a Release build: 0.0% CPU idle, 0.17% with music playing, under 25 MB memory
 
 - [x] AirPods and Bluetooth headphones: connect and disconnect moments with battery per bud and case, low-battery alert, noise control (Off / Noise Cancellation / Transparency) on a headphones page; wired headphones (USB-C EarPods, USB headsets, the jack) through Core Audio
 - [x] Synced lyrics (opt-in) from lrclib.net, cached, line changes scheduled only while visible
+- [x] The line being sung under the closed notch: a strip the notch grows below the camera row (`ActivityRenderer.compactDetail`), folding away while paused, for intros, long instrumental breaks and after the last line; its own toggle in Settings
 - [x] Weather (opt-in) from Open-Meteo: page with now, next hours and today's range; rain heads-up; city search or approximate location (rounded); refreshes every 30 min, on wake and when stale
 - [x] Open notch fits its content instead of a fixed height; header status degrades detail by detail instead of wrapping
 - [x] License notices shipped inside the app (Settings > About > Licenses), checked in CI

@@ -25,8 +25,10 @@ struct FeatureSnapshotExport {
     let chrome = NotchChrome()
     let settings: LiovaSettings
 
+    private let scratch = ScratchDefaults()
+
     init() throws {
-        settings = try LiovaSettings(defaults: #require(UserDefaults(suiteName: "snap.\(UUID())")))
+        settings = LiovaSettings(defaults: scratch.defaults)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 
@@ -50,6 +52,44 @@ struct FeatureSnapshotExport {
             id: "build", source: "cli", title: "Building Liova", symbol: "hammer.fill", progress: 0.4, tint: .blue
         ))
         try render("media-3-preempted-expanded", .expanded)
+    }
+
+    @Test func lyricsUnderTheClosedNotch() async throws {
+        let provider = FakeNowPlaying()
+        let feature = NowPlayingFeature(engine: engine, settings: settings, provider: provider)
+        let words = SyncedLyrics(lines: [
+            .init(time: 0, text: "Under the neon, we were golden"),
+            .init(time: 60, text: "And every streetlight on the boulevard was singing back our names tonight"),
+            .init(time: 120, text: ""),
+            .init(time: 122, text: "Hold on"),
+        ])
+        settings.lyricsEnabled = true
+        let lyrics = LyricsFeature(
+            settings: settings, fetcher: FakeLyricsFetcher(answer: .synced(words)), cache: LyricsCache(directory: nil)
+        )
+        renderers.register(NowPlayingRenderer(feature: feature, lyrics: lyrics), forSource: NowPlayingPolicy.source)
+        feature.onInfoChange = { lyrics.update($0) }
+        feature.start()
+        var info = NowPlayingInfo(
+            bundleIdentifier: "com.spotify.client", title: "Golden Hour", artist: "The Midnight Owls",
+            duration: 241, elapsedTime: 10, timestamp: Date(), isPlaying: true
+        )
+        info.artworkData = Self.gradientPNG()
+        provider.emit(info)
+        for _ in 0 ..< 200 where feature.artwork == nil || !lyrics.showsCompactLine {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        try render("lyrics-1-closed", .closed)
+        try render("lyrics-2-peek", .peek)
+        info.elapsedTime = 70
+        info.timestamp = Date()
+        provider.emit(info)
+        try render("lyrics-3-closed-long-line", .closed)
+        info.elapsedTime = 120.5
+        info.timestamp = Date()
+        provider.emit(info)
+        try render("lyrics-4-closed-short-break", .closed)
+        try render("lyrics-5-expanded", .expanded)
     }
 
     @Test func huds() throws {

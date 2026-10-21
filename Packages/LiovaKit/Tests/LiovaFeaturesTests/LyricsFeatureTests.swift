@@ -44,8 +44,10 @@ struct LyricsFeatureTests {
         ),
     ])
 
+    private let scratch = ScratchDefaults()
+
     init() throws {
-        settings = try LiovaSettings(defaults: #require(UserDefaults(suiteName: "lyrics.\(UUID())")))
+        settings = LiovaSettings(defaults: scratch.defaults)
         fetcher = FakeLyricsFetcher(answer: .synced(synced))
         let clock = clock
         feature = LyricsFeature(
@@ -184,6 +186,102 @@ struct LyricsFeatureTests {
         #expect(feature.status == .off)
         #expect(feature.lyrics == nil)
         #expect(!settings.lyricsEnabled)
+    }
+
+    // MARK: - Under the closed notch
+
+    @Test func closedNotchLineFollowsTheSinging() {
+        let line = { (position: TimeInterval) in
+            LyricsFeature.compactLine(in: synced, at: position, isPlaying: true)
+        }
+        #expect(line(0.5) == "one")
+        #expect(line(2) == "two")
+        // A two-second break keeps the strip, with a note.
+        #expect(line(4.5) == "♪")
+        #expect(line(6.5) == "four")
+        // Paused, nothing: the strip folds away.
+        #expect(LyricsFeature.compactLine(in: synced, at: 0.5, isPlaying: false) == nil)
+    }
+
+    @Test func closedNotchFoldsAwayWhenThereIsNothingToSing() {
+        let song = SyncedLyrics(lines: [
+            .init(time: 5, text: "first"), .init(time: 8, text: ""), .init(time: 30, text: "back"),
+            .init(time: 40, text: ""),
+        ])
+        let line = { (position: TimeInterval) in
+            LyricsFeature.compactLine(in: song, at: position, isPlaying: true)
+        }
+        #expect(line(1) == nil) // the intro
+        #expect(line(9) == nil) // a long solo
+        #expect(line(27) == "♪") // …until the singing is about to come back
+        #expect(line(31) == "back")
+        #expect(line(41) == nil) // an empty last line
+        // A last line with words gets its moment, then the outro is music.
+        #expect(LyricsFeature.compactLine(in: synced, at: 6 + LyricsFeature.lastLineHold - 0.1, isPlaying: true)
+            == "four")
+        #expect(LyricsFeature.compactLine(in: synced, at: 6 + LyricsFeature.lastLineHold, isPlaying: true) == nil)
+    }
+
+    @Test func nextChangeIncludesTheLastLineRunningOut() {
+        #expect(LyricsFeature.nextChange(in: synced, after: 1) == 2)
+        #expect(LyricsFeature.nextChange(in: synced, after: -3) == 0)
+        #expect(LyricsFeature.nextChange(in: synced, after: 6.5) == 6 + LyricsFeature.lastLineHold)
+        #expect(LyricsFeature.nextChange(in: synced, after: 6 + LyricsFeature.lastLineHold) == nil)
+    }
+
+    @Test func closedNotchShowsTheLineWhilePlaying() async throws {
+        settings.lyricsEnabled = true
+        #expect(feature.isShownInClosedNotch)
+        feature.update(song(elapsed: 0))
+        #expect(!feature.showsCompactLine) // still looking it up
+        try await settle()
+        #expect(feature.showsCompactLine)
+        #expect(feature.compactLine == "one")
+        feature.update(song(elapsed: 2.5))
+        #expect(feature.compactLine == "two")
+        // Pausing folds the strip but keeps the text, so it fades out with its words.
+        feature.update(song(elapsed: 2.5, playing: false))
+        #expect(!feature.showsCompactLine)
+        #expect(feature.compactLine == "two")
+        // A new song folds it until its lyrics arrive.
+        feature.update(song(elapsed: 2.5))
+        #expect(feature.showsCompactLine)
+        feature.update(song("Fix You", elapsed: 2.5))
+        #expect(!feature.showsCompactLine)
+    }
+
+    @Test func closedNotchLineCanBeTurnedOffOnItsOwn() async throws {
+        settings.lyricsEnabled = true
+        feature.update(song(elapsed: 0.5))
+        try await settle()
+        #expect(feature.showsCompactLine)
+        settings.lyricsInClosedNotch = false
+        feature.syncWithSettings()
+        #expect(!feature.isShownInClosedNotch)
+        #expect(!feature.showsCompactLine)
+        #expect(feature.lyrics == synced) // the open notch still has them
+        settings.lyricsInClosedNotch = true
+        feature.syncWithSettings()
+        #expect(feature.showsCompactLine)
+        // Turning lyrics off takes the line with it.
+        feature.setEnabled(false)
+        #expect(!feature.showsCompactLine)
+        #expect(!feature.isShownInClosedNotch)
+    }
+
+    @Test func closedNotchFoldsOnItsOwnAfterTheLastLine() async throws {
+        settings.lyricsEnabled = true
+        let start = Date()
+        clock.now = start
+        // Just before the last line's moment runs out (the line shows `lead` early).
+        feature.update(song(elapsed: 6 + LyricsFeature.lastLineHold - LyricsFeature.lead - 0.2))
+        try await settle()
+        feature.viewerAppeared()
+        #expect(feature.showsCompactLine)
+        clock.now = start + 0.25
+        try await Task.sleep(for: .milliseconds(450))
+        #expect(!feature.showsCompactLine)
+        feature.viewerLeft()
     }
 }
 

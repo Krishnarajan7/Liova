@@ -22,6 +22,14 @@ private struct MenuContent: View {
 
     var body: some View {
         Text("Liova \(Bundle.main.shortVersion)")
+        if let release = coordinator.updates.availableRelease {
+            Button("Update to \(release.version.description)…") { coordinator.showSettings(tab: .updates) }
+        } else {
+            Button("Check for Updates…") {
+                coordinator.updates.checkNow()
+                coordinator.showSettings(tab: .updates)
+            }
+        }
         Divider()
         Button("Show Demo Activity") { coordinator.runDemo() }
         SettingsLink {

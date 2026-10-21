@@ -15,6 +15,8 @@ final class AppCoordinator {
     let settings = LiovaSettings()
     let engine = ActivityEngine()
     let launchAtLogin = LaunchAtLogin()
+    /// Which Settings tab is showing; set before opening Settings to land on one.
+    var settingsTab: SettingsTab = .general
 
     @ObservationIgnored private let displayManager = DisplayManager()
     @ObservationIgnored private let renderers = ActivityRendererRegistry()
@@ -28,6 +30,7 @@ final class AppCoordinator {
     @ObservationIgnored private lazy var headphones = HeadphonesFeature(engine: engine, settings: settings)
     @ObservationIgnored private lazy var lyrics = LyricsFeature(settings: settings)
     @ObservationIgnored private(set) lazy var weather = WeatherFeature(engine: engine, settings: settings)
+    @ObservationIgnored private(set) lazy var updates = UpdateFeature(engine: engine, settings: settings)
     @ObservationIgnored private lazy var notchSystem = NotchSystem(
         engine: engine,
         settings: settings,
@@ -92,6 +95,7 @@ final class AppCoordinator {
         headphones.syncWithSettings()
         calendar.syncWithSettings()
         weather.syncWithSettings()
+        updates.syncWithSettings()
         startPluginServer()
         settingsObservation = ObservationLoop { [weak self] in
             guard let self else { return }
@@ -104,6 +108,7 @@ final class AppCoordinator {
                 settings.lowBatteryThreshold,
                 settings.nowPlayingEnabled,
                 settings.lyricsEnabled,
+                settings.lyricsInClosedNotch,
                 settings.hudReplacementEnabled,
                 settings.agentIslandEnabled,
                 settings.downloadsEnabled,
@@ -113,7 +118,8 @@ final class AppCoordinator {
                 settings.calendarEnabled,
                 settings.weatherEnabled,
                 settings.weatherPlace,
-                settings.rainAlertsEnabled
+                settings.rainAlertsEnabled,
+                settings.automaticUpdateChecks
             )
         } onChange: { [weak self] in
             self?.notchSystem.settingsDidChange()
@@ -127,6 +133,7 @@ final class AppCoordinator {
             self?.headphones.syncWithSettings()
             self?.calendar.syncWithSettings()
             self?.weather.syncWithSettings()
+            self?.updates.syncWithSettings()
         }
         Log.app.info("Liova started")
     }
@@ -149,6 +156,7 @@ final class AppCoordinator {
         headphones.stop()
         calendar.stop()
         weather.stop()
+        updates.stop()
         downloads.stop()
         notchSystem.stop()
     }
@@ -175,6 +183,10 @@ final class AppCoordinator {
         renderers.register(TimerRenderer(feature: timers), forSource: TimerPolicy.source)
         renderers.register(CalendarRenderer(feature: calendar), forSource: CalendarPolicy.source)
         renderers.register(WeatherRenderer(feature: weather), forSource: WeatherPolicy.source)
+        renderers.register(
+            UpdateRenderer(feature: updates) { [weak self] in self?.showSettings(tab: .updates) },
+            forSource: UpdatePolicy.source
+        )
         renderers.register(DownloadsRenderer(feature: downloads), forSource: DownloadsPolicy.source)
         hud.sideHUD = { [volumeBar, brightnessBar] state in
             (state.kind == .brightness ? brightnessBar : volumeBar).show(state)
@@ -241,10 +253,7 @@ final class AppCoordinator {
         chrome.trailingStatus = {
             Self.trailingStatus(battery: battery, capture: capture, headphones: headphones)
         }
-        chrome.openSettings = {
-            NSApp.activate()
-            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-        }
+        chrome.openSettings = { [weak self] in self?.showSettings() }
     }
 
     /// macOS posts this when any app's Accessibility trust changes, so Liova notices the
@@ -262,34 +271,18 @@ final class AppCoordinator {
             }
         }
     }
-
-    /// Starts plugin tier 1: the local socket that the `liova` CLI, scripts and agents talk to.
-    private func startPluginServer() {
-        let executor = executor
-        let agents = agents
-        let server = IPCServer(handler: IPCClosureHandler { command, _ in
-            switch command {
-            case let .agentEvent(event):
-                await agents.handle(event)
-                return .success()
-            case let .agentPermission(request):
-                return await .decided(agents.requestPermission(request))
-            default:
-                return await executor.execute(command, origin: .socket)
-            }
-        })
-        do {
-            try server.start()
-            ipcServer = server
-            Log.app.info("Plugin socket listening at \(server.socketURL.path, privacy: .public)")
-        } catch {
-            // Liova still works without the socket; only external activities are unavailable.
-            Log.app.error("Plugin socket failed to start: \(String(describing: error), privacy: .public)")
-        }
-    }
 }
 
 extension AppCoordinator {
+    /// Opens Settings, on `tab` when given.
+    func showSettings(tab: SettingsTab? = nil) {
+        if let tab {
+            settingsTab = tab
+        }
+        NSApp.activate()
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+    }
+
     /// A short, self-ending activity so new users can see what Liova does.
     func runDemo() {
         demoTask?.cancel()
@@ -350,6 +343,31 @@ final class ObservationLoop {
 }
 
 private extension AppCoordinator {
+    /// Starts plugin tier 1: the local socket that the `liova` CLI, scripts and agents talk to.
+    func startPluginServer() {
+        let executor = executor
+        let agents = agents
+        let server = IPCServer(handler: IPCClosureHandler { command, _ in
+            switch command {
+            case let .agentEvent(event):
+                await agents.handle(event)
+                return .success()
+            case let .agentPermission(request):
+                return await .decided(agents.requestPermission(request))
+            default:
+                return await executor.execute(command, origin: .socket)
+            }
+        })
+        do {
+            try server.start()
+            ipcServer = server
+            Log.app.info("Plugin socket listening at \(server.socketURL.path, privacy: .public)")
+        } catch {
+            // Liova still works without the socket; only external activities are unavailable.
+            Log.app.error("Plugin socket failed to start: \(String(describing: error), privacy: .public)")
+        }
+    }
+
     /// Beside the camera in the open notch. Never squeezed: when everything doesn't fit,
     /// details drop one at a time (headphones level, charging bolt, battery percentage),
     /// each still in its tooltip, instead of wrapping.

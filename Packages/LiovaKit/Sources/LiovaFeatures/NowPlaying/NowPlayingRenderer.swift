@@ -3,8 +3,8 @@ import LiovaProviders
 import LiovaUI
 import SwiftUI
 
-/// Draws the media activity: artwork and a live indicator when closed, and a full
-/// player with scrubber and controls when open.
+/// Draws the media activity: artwork and a live indicator when closed (with the line being
+/// sung under it, when lyrics are on), and a full player with scrubber and controls when open.
 @MainActor
 public final class NowPlayingRenderer: ActivityRenderer {
     private let feature: NowPlayingFeature
@@ -20,7 +20,15 @@ public final class NowPlayingRenderer: ActivityRenderer {
     }
 
     public func compactTrailing(for _: Activity) -> AnyView? {
-        AnyView(PlayingIndicator(feature: feature))
+        AnyView(PlayingIndicator(feature: feature, lyrics: lyrics))
+    }
+
+    public func showsCompactDetail(for _: Activity) -> Bool {
+        lyrics?.showsCompactLine ?? false
+    }
+
+    public func compactDetail(for _: Activity) -> AnyView? {
+        lyrics.map { AnyView(CompactLyricLine(feature: $0)) }
     }
 
     public func expanded(for _: Activity) -> AnyView? {
@@ -64,8 +72,13 @@ private struct ArtworkView: View {
 ///
 /// The bars are Core Animation layers that the window server animates on its own, so music
 /// playing with the notch closed stays within the 0.5% CPU budget (see `EqualizerBars`).
+///
+/// It also keeps the closed notch's lyric line in time: while it's on screen, lyrics schedule
+/// their line changes (see `LyricsFeature`).
 private struct PlayingIndicator: View {
     let feature: NowPlayingFeature
+    let lyrics: LyricsFeature?
+    @Environment(\.notchCompactVisible) private var compactVisible
 
     var body: some View {
         let isPlaying = feature.info?.isPlaying ?? false
@@ -79,6 +92,61 @@ private struct PlayingIndicator: View {
                 .opacity(isPlaying ? 0 : 1)
         }
         .animation(.easeOut(duration: 0.2), value: isPlaying)
+        .modifier(LyricsViewer(feature: lyrics, isActive: compactVisible && lyrics?.isShownInClosedNotch == true))
+    }
+}
+
+/// The line being sung, under the closed notch. A new line slides up, like the open card.
+private struct CompactLyricLine: View {
+    let feature: LyricsFeature
+
+    var body: some View {
+        let line = feature.compactLine
+        ZStack {
+            Text(line)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.9))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .truncationMode(.tail)
+                // Keyed by line, so a repeated line ("yeah, yeah") still moves on.
+                .id(feature.lineIndex ?? -1)
+                .transition(.asymmetric(
+                    insertion: .opacity.combined(with: .offset(y: 6)),
+                    removal: .opacity.combined(with: .offset(y: -6))
+                ))
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 17)
+        .clipped()
+        .animation(.spring(response: 0.38, dampingFraction: 0.9), value: feature.lineIndex)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(line))
+    }
+}
+
+/// Counts a view as showing lyrics while `isActive`, so line changes are scheduled only
+/// while someone can see them. Balanced on every path: activation, deactivation, removal.
+private struct LyricsViewer: ViewModifier {
+    let feature: LyricsFeature?
+    let isActive: Bool
+    @State private var isRegistered = false
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { register(isActive) }
+            .onChange(of: isActive) { _, active in register(active) }
+            .onDisappear { register(false) }
+    }
+
+    private func register(_ active: Bool) {
+        guard let feature, active != isRegistered else { return }
+        isRegistered = active
+        if active {
+            feature.viewerAppeared()
+        } else {
+            feature.viewerLeft()
+        }
     }
 }
 

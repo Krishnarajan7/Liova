@@ -84,7 +84,7 @@ A lightweight log of significant decisions and why we made them. Each entry is s
 
 **Context.** Developer ID signing and notarization need a paid Apple Developer Program membership ($99/year), which we don't have yet. Without notarization, Gatekeeper blocks the first launch, and Homebrew's official cask repository disables casks that fail Gatekeeper.
 
-**Decision.** Builds are ad-hoc signed (`CODE_SIGN_IDENTITY=-`). Distribution is: build from source (`make run`); an ad-hoc signed DMG on GitHub Releases with clear first-launch instructions; and a self-hosted Homebrew tap (`brew install --cask krishnarajan7/tap/liova`). Sparkle updates use EdDSA signatures, which need no Apple account. Notarization is added later if an account is obtained. Details in [DISTRIBUTION.md](DISTRIBUTION.md).
+**Decision.** Builds are ad-hoc signed (`CODE_SIGN_IDENTITY=-`). Distribution is: build from source (`make run`); an ad-hoc signed DMG on GitHub Releases with clear first-launch instructions; and a self-hosted Homebrew tap (`brew install --cask krishnarajan7/tap/liova`). Updates are verified against the release certificate's signature, which needs no Apple account ([ADR-017](#adr-017-built-in-updates-trust-the-release-certificate)). Notarization is added later if an account is obtained. Details in [DISTRIBUTION.md](DISTRIBUTION.md).
 
 **Consequences.** Users see a Gatekeeper warning on first launch and must approve Liova in System Settings. No official Homebrew cask. Developers' ad-hoc builds change identity each rebuild, so we recommend a local self-signed certificate for stable permissions. Moving to notarization later requires no architectural changes.
 
@@ -104,7 +104,7 @@ A lightweight log of significant decisions and why we made them. Each entry is s
 
 **Context.** Liova sees sensitive things: what you're listening to, your calendar, your coding-agent sessions. Users and companies need to trust it without auditing network traffic.
 
-**Decision.** Liova collects no analytics or usage data. Crash reports are opt-in and stay local unless the user chooses to share them. Network access is limited to features that clearly need it (update checks, lyrics) and can be turned off.
+**Decision.** Liova collects no analytics or usage data. Crash reports are opt-in and stay local unless the user chooses to share them. Network access is limited to features that clearly need it (update checks, lyrics, weather) and can be turned off.
 
 **Consequences.** We learn about usage only from issues, Discussions and voluntary feedback. Performance claims are backed by our own CI measurements instead of field data.
 
@@ -177,4 +177,14 @@ A lightweight log of significant decisions and why we made them. Each entry is s
 **Decision.** The wire protocol gains two ops, `agentEvent` and `agentPermission`, with generic payloads (`AgentEvent`, `AgentPermissionRequest`, `AgentDecision`). Per-agent adapters live in the `liova` CLI, which the agent runs as its hook. A permission request holds its socket request open until the user answers; any timeout, error or "answer in terminal" returns `ask`, and the hook then prints nothing so the agent falls back to its own prompt. Agent activities use the reserved `system.agents` source, so no other client can fake or dismiss a prompt. Prompt text is never sent, only event kinds, the project folder name and a short tool summary.
 
 **Consequences.** Adding an agent is a CLI adapter plus an installer, with no app changes. If Liova isn't running, hooks exit immediately and agents behave exactly as without Liova.
+
+## ADR-017: Built-in updates trust the release certificate
+
+**Date:** 2026-10-21
+
+**Context.** Early users need updates, or they stay on the first version they tried. Sparkle is the usual answer, but it's a dependency (and a framework, an XPC installer and an appcast to host), and its EdDSA key would be one more secret to guard. Without a Developer ID, Gatekeeper can't vouch for an update either.
+
+**Decision.** Liova checks GitHub's releases API itself and installs an update in place only when the new app's code signature satisfies the running copy's designated requirement, which for releases pins a self-signed "Liova Release" certificate held only in CI secrets. A SHA-256 from the release catches broken downloads; the signature is the trust. A small shell helper swaps the app after Liova quits and puts the old one back if the move fails. Copies that can't verify (ad-hoc builds) or can't write their folder get the checked installer opened in Finder. Checks run daily and can be turned off; they send only the app's version. Details in [DISTRIBUTION.md](DISTRIBUTION.md#updates).
+
+**Consequences.** No new dependency and no appcast; the GitHub release is the feed. The certificate is now as sensitive as Sparkle's private key and must never change casually: a new one means one manual reinstall for everyone. The certificate also gives releases a stable identity, so users keep their macOS permissions across updates. If a Developer ID is obtained later, the same check works unchanged (the requirement then pins Apple's chain), and Sparkle can still be reconsidered.
 

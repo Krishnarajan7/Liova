@@ -36,6 +36,42 @@ struct NotchLayoutTests {
         #expect(live.height == idle.height)
     }
 
+    @Test func detailStripGrowsTheClosedNotchBelowTheCamera() {
+        let live = NotchLayout.spec(for: .closed, geometry: airM4, hasActivity: true)
+        let detail = NotchLayout.spec(for: .closed, geometry: airM4, hasActivity: true, compactDetail: true)
+        #expect(detail.height == live.height + NotchLayout.compactDetailHeight)
+        #expect(detail.bodyWidth == live.bodyWidth + 2 * NotchLayout.compactDetailOverhang)
+        #expect(detail.bottomRadius > live.bottomRadius)
+        // The ears stay where they were: the camera row's height doesn't change.
+        #expect(detail.height - NotchLayout.compactDetailHeight == airM4.notchSize.height)
+        // Room for a line of lyrics on a 13-inch notch, clear of the rounded corners.
+        #expect(detail.bodyWidth - 2 * detail.bottomRadius >= 320)
+    }
+
+    @Test func detailStripNeedsAnActivityAndStaysWhilePeeking() {
+        #expect(NotchLayout.spec(for: .closed, geometry: airM4, hasActivity: false, compactDetail: true)
+            == NotchLayout.spec(for: .closed, geometry: airM4, hasActivity: false))
+        let closed = NotchLayout.spec(for: .closed, geometry: airM4, hasActivity: true, compactDetail: true)
+        let peek = NotchLayout.spec(for: .peek, geometry: airM4, hasActivity: true, compactDetail: true)
+        #expect(peek.height == closed.height + NotchLayout.peekGrowth.height)
+        #expect(peek.bodyWidth == closed.bodyWidth + NotchLayout.peekGrowth.width)
+        // The open notch is the same with or without it.
+        #expect(NotchLayout.spec(for: .expanded, geometry: airM4, hasActivity: true, compactDetail: true)
+            == NotchLayout.spec(for: .expanded, geometry: airM4, hasActivity: true))
+        #expect(peek.shapeWidth < NotchLayout.spec(for: .expanded, geometry: airM4, hasActivity: true).shapeWidth)
+    }
+
+    @Test func detailStripIsPartOfTheHotZone() {
+        let panel = airM4.panelFrame(contentSize: NotchLayout.panelSize(for: airM4))
+        let spec = NotchLayout.spec(for: .closed, geometry: airM4, hasActivity: true, compactDetail: true)
+        let zone = NotchLayout.hotZone(spec, inPanel: panel, slop: 4)
+        let onTheLine = CGPoint(x: airM4.notchFrame.midX, y: airM4.notchFrame.minY - 12)
+        #expect(zone.contains(onTheLine))
+        #expect(!NotchLayout.hotZone(
+            NotchLayout.spec(for: .closed, geometry: airM4, hasActivity: true), inPanel: panel, slop: 4
+        ).contains(onTheLine))
+    }
+
     @Test func statesGrowMonotonically() {
         let closed = NotchLayout.spec(for: .closed, geometry: airM4, hasActivity: true)
         let peek = NotchLayout.spec(for: .peek, geometry: airM4, hasActivity: true)
@@ -74,9 +110,13 @@ struct NotchLayoutTests {
     @Test(arguments: [NotchPresentation.closed, .peek, .expanded], [false, true])
     func everyStateFitsInsideTheFixedPanel(presentation: NotchPresentation, hasActivity: Bool) {
         let panel = NotchLayout.panelSize(for: airM4)
-        let spec = NotchLayout.spec(for: presentation, geometry: airM4, hasActivity: hasActivity)
-        #expect(spec.shapeWidth <= panel.width)
-        #expect(spec.height <= panel.height)
+        for detail in [false, true] {
+            let spec = NotchLayout.spec(
+                for: presentation, geometry: airM4, hasActivity: hasActivity, compactDetail: detail
+            )
+            #expect(spec.shapeWidth <= panel.width)
+            #expect(spec.height <= panel.height)
+        }
     }
 
     @Test func hotZoneIncludesTopEdgeOfScreen() {
@@ -212,5 +252,16 @@ struct FileDragDetectorTests {
         let ended = detector.mouseUp()
         #expect(!any)
         #expect(!ended)
+    }
+}
+
+struct EqualizerBarsHealthTests {
+    @Test func aQuietRunningLinkHasStalled() {
+        #expect(EqualizerBarsView.hasStalled(isRunning: true, lastTick: 10, now: 12))
+    }
+
+    @Test func aTickingOrPausedLinkHasNot() {
+        #expect(!EqualizerBarsView.hasStalled(isRunning: true, lastTick: 10, now: 10.5))
+        #expect(!EqualizerBarsView.hasStalled(isRunning: false, lastTick: 10, now: 100))
     }
 }

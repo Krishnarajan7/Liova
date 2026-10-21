@@ -163,10 +163,12 @@ final class HUDFeatureFixture {
     let brightness = HUDFakeBrightness(0.5)
     let tap = HUDFakeKeyTap()
 
+    private let scratch = ScratchDefaults()
+
     init() throws {
         let clock = clock
         engine = ActivityEngine(now: { clock.now })
-        settings = try LiovaSettings(defaults: #require(UserDefaults(suiteName: "app.liova.tests.\(UUID())")))
+        settings = LiovaSettings(defaults: scratch.defaults)
     }
 
     func makeFeature(safeMode: Bool = false) -> HUDFeature {

@@ -31,8 +31,10 @@ struct CaptureIndicatorTests {
     let settings: LiovaSettings
     let feature: CaptureIndicatorFeature
 
+    private let scratch = ScratchDefaults()
+
     init() throws {
-        settings = try LiovaSettings(defaults: #require(UserDefaults(suiteName: "capture.\(UUID())")))
+        settings = LiovaSettings(defaults: scratch.defaults)
         feature = CaptureIndicatorFeature(engine: engine, settings: settings, monitor: monitor)
     }
 
@@ -71,8 +73,9 @@ struct CaptureIndicatorTests {
 
 @MainActor
 struct WelcomeTests {
-    @Test func showsOnceEver() throws {
-        let defaults = try #require(UserDefaults(suiteName: "welcome.\(UUID())"))
+    @Test func showsOnceEver() {
+        let scratch = ScratchDefaults()
+        let defaults = scratch.defaults
         let engine = ActivityEngine()
         let welcome = WelcomeFeature(engine: engine, settings: LiovaSettings(defaults: defaults))
         #expect(welcome.showIfNeeded())

@@ -57,7 +57,7 @@ public final class LiovaSettings {
     }
 
     /// When the music bars in the closed notch move while something plays. Moving bars keep
-    /// the window server compositing every frame, so by default they rest on battery.
+    /// the window server compositing every frame; they run at 20 fps on battery.
     public var musicBars: MusicBarsMode {
         didSet { store(musicBars.rawValue, .musicBars) }
     }
@@ -95,6 +95,11 @@ public final class LiovaSettings {
     /// Show synced lyrics for what's playing. Off by default: it looks the song up on lrclib.net.
     public var lyricsEnabled: Bool {
         didSet { store(lyricsEnabled, .lyricsEnabled) }
+    }
+
+    /// With lyrics on, the line being sung also shows under the closed notch.
+    public var lyricsInClosedNotch: Bool {
+        didSet { store(lyricsInClosedNotch, .lyricsInClosedNotch) }
     }
 
     /// Weather in the open notch. Off by default: it asks Open-Meteo about a location.
@@ -137,6 +142,26 @@ public final class LiovaSettings {
         didSet { store(agentOpensNotchForApprovals, .agentOpensNotchForApprovals) }
     }
 
+    /// Look for a new version once a day (one request to GitHub's public API).
+    public var automaticUpdateChecks: Bool {
+        didSet { store(automaticUpdateChecks, .automaticUpdateChecks) }
+    }
+
+    /// Offer pre-release (beta) versions too.
+    public var betaUpdates: Bool {
+        didSet { store(betaUpdates, .betaUpdates) }
+    }
+
+    /// A version the user chose to skip; it isn't announced again.
+    public var skippedUpdateVersion: String? {
+        didSet { storeOptional(skippedUpdateVersion, .skippedUpdateVersion) }
+    }
+
+    /// When Liova last looked for a new version.
+    public var lastUpdateCheck: Date? {
+        didSet { storeOptional(lastUpdateCheck, .lastUpdateCheck) }
+    }
+
     public var lowBatteryThreshold: Int {
         didSet {
             let clamped = min(max(lowBatteryThreshold, 5), 50)
@@ -173,6 +198,7 @@ public final class LiovaSettings {
         agentIslandEnabled = defaults.object(forKey: Key.agentIslandEnabled.rawValue) as? Bool ?? true
         headphonesEnabled = defaults.object(forKey: Key.headphonesEnabled.rawValue) as? Bool ?? true
         lyricsEnabled = defaults.object(forKey: Key.lyricsEnabled.rawValue) as? Bool ?? false
+        lyricsInClosedNotch = defaults.object(forKey: Key.lyricsInClosedNotch.rawValue) as? Bool ?? true
         weatherEnabled = defaults.object(forKey: Key.weatherEnabled.rawValue) as? Bool ?? false
         weatherPlace = defaults.data(forKey: Key.weatherPlace.rawValue)
             .flatMap { try? JSONDecoder().decode(WeatherPlace.self, from: $0) }
@@ -182,9 +208,17 @@ public final class LiovaSettings {
         agentOpensNotchForApprovals = defaults.object(forKey: Key.agentOpensNotchForApprovals.rawValue) as? Bool
             ?? true
         lowBatteryThreshold = min(max(defaults.object(forKey: Key.lowBatteryThreshold.rawValue) as? Int ?? 20, 5), 50)
+        automaticUpdateChecks = defaults.object(forKey: Key.automaticUpdateChecks.rawValue) as? Bool ?? true
+        betaUpdates = defaults.object(forKey: Key.betaUpdates.rawValue) as? Bool ?? false
+        skippedUpdateVersion = defaults.string(forKey: Key.skippedUpdateVersion.rawValue)
+        lastUpdateCheck = defaults.object(forKey: Key.lastUpdateCheck.rawValue) as? Date
     }
 
     private enum Key: String {
+        case automaticUpdateChecks
+        case betaUpdates
+        case skippedUpdateVersion
+        case lastUpdateCheck
         case openOnHover
         case hoverDelay
         case displayPlacement
@@ -207,6 +241,7 @@ public final class LiovaSettings {
         case agentIslandEnabled
         case headphonesEnabled
         case lyricsEnabled
+        case lyricsInClosedNotch
         case weatherEnabled
         case weatherPlace
         case temperatureUnit
@@ -218,6 +253,14 @@ public final class LiovaSettings {
         defaults.set(value, forKey: key.rawValue)
     }
 
+    private func storeOptional(_ value: (some Any)?, _ key: Key) {
+        if let value {
+            defaults.set(value, forKey: key.rawValue)
+        } else {
+            defaults.removeObject(forKey: key.rawValue)
+        }
+    }
+
     private static func loadMusicBars(_ defaults: UserDefaults) -> MusicBarsMode {
         if let mode = defaults.string(forKey: Key.musicBars.rawValue).flatMap(MusicBarsMode.init(rawValue:)) {
             return mode
@@ -226,7 +269,9 @@ public final class LiovaSettings {
         if let animated = defaults.object(forKey: Key.animatedMusicBars.rawValue) as? Bool {
             return animated ? .always : .off
         }
-        return .pluggedIn
+        // Resting bars on battery read as broken, and 20 fps there costs about 1.8%
+        // WindowServer CPU (docs/PERFORMANCE.md). When plugged in and Off stay a choice.
+        return .always
     }
 
     private static func clampHoverDelay(_ value: Double) -> Double {

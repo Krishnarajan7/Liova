@@ -10,6 +10,7 @@ public final class NotchController {
     private let model: NotchModel
     private let engine: ActivityEngine
     private let settings: LiovaSettings
+    private let renderers: ActivityRendererRegistry
     private let panel: NotchPanel
     private var interaction = NotchInteraction()
     private var enterTask: Task<Void, Never>?
@@ -52,6 +53,7 @@ public final class NotchController {
         self.display = display
         self.engine = engine
         self.settings = settings
+        self.renderers = renderers
         model = NotchModel(geometry: display.geometry, showsIdleVirtualNotch: settings.showVirtualNotchWhenIdle)
         panel = NotchPanel(frame: Self.panelFrame(for: display.geometry))
 
@@ -165,6 +167,7 @@ public final class NotchController {
             for: closing ? .expanded : interaction.presentation,
             geometry: model.geometry,
             hasActivity: engine.current != nil,
+            compactDetail: renderers.showsCompactDetail(for: engine.current),
             contentHeight: model.fittedContentHeight
         )
         let slop: CGFloat = interaction.presentation == .expanded ? 10 : 4

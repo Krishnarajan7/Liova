@@ -3,7 +3,8 @@ import LiovaCore
 import LiovaProviders
 import Observation
 
-/// Synced lyrics for what's playing, line by line, in the open notch.
+/// Synced lyrics for what's playing, line by line: in the open notch, and the line being
+/// sung under the closed notch.
 ///
 /// Off until the user turns it on: it's the one feature that asks the internet (lrclib.net)
 /// about the song. Lookups wait a moment after a track change, so skipping through a playlist
@@ -11,6 +12,10 @@ import Observation
 ///
 /// Line changes are scheduled for the moment the next line starts, not polled, and only
 /// while lyrics are on screen; seeking, pausing or changing speed reschedules.
+///
+/// Under the closed notch a line shows only while it's being sung: the strip folds away while
+/// paused, before the first line, through long instrumental breaks and once the last line has
+/// had its moment, so the notch isn't taller than it needs to be for music without words.
 @MainActor
 @Observable
 public final class LyricsFeature {
@@ -27,9 +32,20 @@ public final class LyricsFeature {
     public private(set) var status: Status = .off
     /// The line being sung, as of the last update.
     public private(set) var lineIndex: Int?
+    /// Whether the closed notch shows a line now. Changes only when the strip should come or
+    /// go, so the notch's layout doesn't depend on each new line.
+    public private(set) var showsCompactLine = false
+    /// The line under the closed notch ("♪" for a short instrumental break). Keeps the last
+    /// line after the strip folds away, so it fades out with its text.
+    public private(set) var compactLine = ""
 
     public var isEnabled: Bool {
         settings.lyricsEnabled
+    }
+
+    /// Lyrics are on and the user wants the line under the closed notch too.
+    public var isShownInClosedNotch: Bool {
+        settings.lyricsEnabled && settings.lyricsInClosedNotch
     }
 
     public var lyrics: SyncedLyrics? {
@@ -55,6 +71,11 @@ public final class LyricsFeature {
     /// Show a line this much before it's sung, so it's readable as the singer starts.
     static let lead: TimeInterval = 0.2
     static let songLength: ClosedRange<TimeInterval> = 30 ... 20 * 60
+    /// An instrumental break shorter than this keeps the closed notch's strip, with a note;
+    /// a longer one folds it away until the singing starts again.
+    static let shortBreak: TimeInterval = 4
+    /// How long the last line stays under the closed notch; after that it's the outro.
+    static let lastLineHold: TimeInterval = 8
 
     public init(
         settings: LiovaSettings,
@@ -100,6 +121,9 @@ public final class LyricsFeature {
             if status == .off {
                 query = nil
                 update(info)
+            } else {
+                // The closed-notch line may have been turned on or off.
+                reschedule()
             }
         } else {
             clear(to: .off)
@@ -130,6 +154,28 @@ public final class LyricsFeature {
     }
 
     static let podcastApps: Set<String> = ["com.apple.podcasts", "fm.overcast.overcast", "com.pocketcasts.mac"]
+
+    /// The line for the closed notch at `position`, or nil when the strip should fold away.
+    static func compactLine(in lyrics: SyncedLyrics, at position: TimeInterval, isPlaying: Bool) -> String? {
+        guard isPlaying, let index = lyrics.lineIndex(at: position) else { return nil }
+        let line = lyrics.lines[index]
+        guard index + 1 < lyrics.lines.count else {
+            // The last line gets its moment; what follows is the outro.
+            return line.text.isEmpty || position - line.time >= lastLineHold ? nil : line.text
+        }
+        guard line.text.isEmpty else { return line.text }
+        return lyrics.lines[index + 1].time - position < shortBreak ? "♪" : nil
+    }
+
+    /// When what's shown next changes after `position`: the next line, or the last line's
+    /// hold running out.
+    static func nextChange(in lyrics: SyncedLyrics, after position: TimeInterval) -> TimeInterval? {
+        if let next = lyrics.nextLineTime(after: position) {
+            return next
+        }
+        guard let last = lyrics.lines.last, position < last.time + lastLineHold else { return nil }
+        return last.time + lastLineHold
+    }
 
     // MARK: - Lookup
 
@@ -175,6 +221,7 @@ public final class LyricsFeature {
         lineTask = nil
         query = nil
         lineIndex = nil
+        setCompactLine(nil)
         if status != newStatus {
             status = newStatus
         }
@@ -189,6 +236,7 @@ public final class LyricsFeature {
             if lineIndex != nil {
                 lineIndex = nil
             }
+            setCompactLine(nil)
             return
         }
         let position = elapsed + Self.lead
@@ -196,13 +244,24 @@ public final class LyricsFeature {
         if index != lineIndex {
             lineIndex = index
         }
-        guard viewers > 0, info.isPlaying, let next = lyrics.nextLineTime(after: position) else { return }
+        setCompactLine(Self.compactLine(in: lyrics, at: position, isPlaying: info.isPlaying))
+        guard viewers > 0, info.isPlaying, let next = Self.nextChange(in: lyrics, after: position) else { return }
         let rate = info.playbackRate > 0 ? info.playbackRate : 1
         let wait = max(0.05, (next - position) / rate)
         lineTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(wait), tolerance: .milliseconds(30))
             guard !Task.isCancelled else { return }
             self?.reschedule()
+        }
+    }
+
+    private func setCompactLine(_ line: String?) {
+        let shown = settings.lyricsInClosedNotch ? line : nil
+        if let shown, shown != compactLine {
+            compactLine = shown
+        }
+        if showsCompactLine != (shown != nil) {
+            showsCompactLine = shown != nil
         }
     }
 }

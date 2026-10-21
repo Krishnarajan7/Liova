@@ -21,8 +21,10 @@ struct AgentIslandTests {
     let settings: LiovaSettings
     let feature: AgentIslandFeature
 
+    private let scratch = ScratchDefaults()
+
     init() throws {
-        settings = try LiovaSettings(defaults: #require(UserDefaults(suiteName: "agents.\(UUID())")))
+        settings = LiovaSettings(defaults: scratch.defaults)
         feature = AgentIslandFeature(engine: engine, settings: settings)
     }
 

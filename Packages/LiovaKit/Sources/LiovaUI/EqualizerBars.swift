@@ -9,6 +9,11 @@ import SwiftUI
 /// on battery: smooth, at a fraction of the system cost of 60 fps. It runs only while music
 /// plays, the notch is visible, Low Power Mode is off and `mode` allows it on the current
 /// power source; otherwise the bars rest.
+///
+/// It heals itself: a display link can go quiet after sleep or a display change, and macOS
+/// doesn't always say the window is visible again after waking. So while music plays a
+/// slow check makes sure the bars are doing what they should, and wake or a display
+/// change starts them over.
 public struct EqualizerBars: NSViewRepresentable {
     public var isAnimating: Bool
     public var mode: MusicBarsMode
@@ -45,6 +50,10 @@ public final class EqualizerBarsView: NSView {
     }
 
     nonisolated static let restingLevel: CGFloat = 0.3
+    /// How often, while music plays, the bars check they're in the right state.
+    static let checkInterval: TimeInterval = 4
+    /// A running link that hasn't ticked for this long has gone quiet.
+    nonisolated static let stallAfter: CFTimeInterval = 1
 
     private var bars: [CALayer] = []
     private var isAnimating = false
@@ -52,8 +61,10 @@ public final class EqualizerBarsView: NSView {
     private var color: NSColor = .white
     private var link: CADisplayLink?
     private var startTime = CACurrentMediaTime()
-    private var observers: [any NSObjectProtocol] = []
+    private var observers: [(center: NotificationCenter, token: any NSObjectProtocol)] = []
     private var powerSource: CFRunLoopSource?
+    private var lastTick: CFTimeInterval = 0
+    private var checkTimer: Timer?
 
     init(barCount: Int) {
         super.init(frame: .zero)
@@ -67,11 +78,28 @@ public final class EqualizerBarsView: NSView {
             bars.append(bar)
         }
         // Low Power Mode means the user wants battery over flourish: rest the bars.
-        observers.append(NotificationCenter.default.addObserver(
+        observers.append((NotificationCenter.default, NotificationCenter.default.addObserver(
             forName: .NSProcessInfoPowerStateDidChange, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.syncAnimation() }
-        })
+        }))
+        // After sleep, unlocking or a display change, start the link over.
+        let workspace = NSWorkspace.shared.notificationCenter
+        for name in [
+            NSWorkspace.didWakeNotification,
+            NSWorkspace.screensDidWakeNotification,
+            NSWorkspace.sessionDidBecomeActiveNotification,
+        ] {
+            let token = workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.restartAnimation() }
+            }
+            observers.append((workspace, token))
+        }
+        observers.append((NotificationCenter.default, NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.restartAnimation() }
+        }))
     }
 
     @available(*, unavailable)
@@ -81,7 +109,10 @@ public final class EqualizerBarsView: NSView {
 
     isolated deinit {
         link?.invalidate()
-        observers.forEach(NotificationCenter.default.removeObserver)
+        checkTimer?.invalidate()
+        for observer in observers {
+            observer.center.removeObserver(observer.token)
+        }
         if let powerSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), powerSource, .commonModes)
         }
@@ -107,7 +138,12 @@ public final class EqualizerBarsView: NSView {
             self.color = color
             applyColor()
         }
-        guard isAnimating != self.isAnimating || mode != self.mode else { return }
+        guard isAnimating != self.isAnimating || mode != self.mode else {
+            if Self.hasStalled(isRunning: isLinkRunning, lastTick: lastTick, now: CACurrentMediaTime()) {
+                restartAnimation()
+            }
+            return
+        }
         self.isAnimating = isAnimating
         self.mode = mode
         watchPowerSource(mode != .off)
@@ -142,6 +178,12 @@ public final class EqualizerBarsView: NSView {
                 object: old
             )
         }
+        if newWindow == nil {
+            // Off screen for good: a link left behind would keep its display awake.
+            link?.invalidate()
+            link = nil
+            watchHealth(false)
+        }
     }
 
     override public func viewDidMoveToWindow() {
@@ -154,7 +196,8 @@ public final class EqualizerBarsView: NSView {
                 name: NSWindow.didChangeOcclusionStateNotification, object: window
             )
         }
-        syncAnimation()
+        // A link made for the old window's display may not tick on the new one.
+        restartAnimation()
     }
 
     @objc private func occlusionChanged() {
@@ -181,15 +224,65 @@ public final class EqualizerBarsView: NSView {
                 link.add(to: .main, forMode: .common)
                 self.link = link
             }
+            if link?.isPaused ?? true {
+                // Counts from now, so the stall check gives a resumed link time to tick.
+                lastTick = CACurrentMediaTime()
+            }
             link?.preferredFrameRateRange = onBattery ? Self.batteryFrameRate : Self.pluggedInFrameRate
             link?.isPaused = false
         } else {
             link?.isPaused = true
             setLevels(Array(repeating: Self.restingLevel, count: bars.count))
         }
+        watchHealth(isAnimating && window != nil && mode != .off)
+    }
+
+    /// Throws the link away and decides afresh: after wake or a display change, an old
+    /// link can stay quiet, and the window's visibility may have changed unannounced.
+    private func restartAnimation() {
+        link?.invalidate()
+        link = nil
+        syncAnimation()
+    }
+
+    /// While music plays, every few seconds: is the link ticking, and is it running when
+    /// it should be? Fixes whichever isn't. Off while paused, so it costs nothing at rest.
+    private func watchHealth(_ watch: Bool) {
+        guard watch != (checkTimer != nil) else { return }
+        guard watch else {
+            checkTimer?.invalidate()
+            checkTimer = nil
+            return
+        }
+        let timer = Timer(timeInterval: Self.checkInterval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.healIfStalled() }
+        }
+        timer.tolerance = Self.checkInterval / 2
+        RunLoop.main.add(timer, forMode: .common)
+        checkTimer = timer
+    }
+
+    private var isLinkRunning: Bool {
+        link.map { !$0.isPaused } ?? false
+    }
+
+    private func healIfStalled() {
+        if Self.hasStalled(isRunning: isLinkRunning, lastTick: lastTick, now: CACurrentMediaTime()) {
+            Log.display.notice("Music bars: display link went quiet, restarting")
+            restartAnimation()
+        } else {
+            // Catches a missed "visible again" after wake: resumes if it should be running.
+            syncAnimation()
+        }
+    }
+
+    /// A running link that hasn't ticked in a while has gone quiet. Pure, so it's tested.
+    nonisolated static func hasStalled(isRunning: Bool, lastTick: CFTimeInterval, now: CFTimeInterval) -> Bool {
+        isRunning && now - lastTick > stallAfter
     }
 
     @objc private func tick() {
+        lastTick = CACurrentMediaTime()
         setLevels(Self.levels(at: CACurrentMediaTime() - startTime, count: bars.count))
     }
 

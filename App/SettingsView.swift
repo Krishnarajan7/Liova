@@ -2,23 +2,37 @@ import LiovaCore
 import LiovaFeatures
 import SwiftUI
 
+/// The Settings window's tabs, so other parts of the app can open one.
+enum SettingsTab: Hashable {
+    case general, activities, huds, weather, agents, updates, about
+}
+
 struct SettingsView: View {
-    let coordinator: AppCoordinator
+    @Bindable var coordinator: AppCoordinator
 
     var body: some View {
-        TabView {
+        TabView(selection: $coordinator.settingsTab) {
             GeneralSettings(settings: coordinator.settings, launchAtLogin: coordinator.launchAtLogin)
                 .tabItem { Label("General", systemImage: "gearshape") }
+                .tag(SettingsTab.general)
             ActivitySettings(settings: coordinator.settings, nowPlaying: coordinator.nowPlaying)
                 .tabItem { Label("Activities", systemImage: "bolt.horizontal") }
+                .tag(SettingsTab.activities)
             HUDSettings(settings: coordinator.settings, hud: coordinator.hud)
                 .tabItem { Label("HUDs", systemImage: "speaker.wave.2") }
+                .tag(SettingsTab.huds)
             WeatherSettings(settings: coordinator.settings, weather: coordinator.weather)
                 .tabItem { Label("Weather", systemImage: "cloud.sun") }
+                .tag(SettingsTab.weather)
             AgentSettings(settings: coordinator.settings)
                 .tabItem { Label("Agents", systemImage: "sparkle") }
+                .tag(SettingsTab.agents)
+            UpdateSettings(settings: coordinator.settings, updates: coordinator.updates)
+                .tabItem { Label("Updates", systemImage: "arrow.down.circle") }
+                .tag(SettingsTab.updates)
             AboutSettings()
                 .tabItem { Label("About", systemImage: "info.circle") }
+                .tag(SettingsTab.about)
         }
         .frame(width: 460)
         .fixedSize(horizontal: false, vertical: true)
@@ -94,11 +108,13 @@ private struct ActivitySettings: View {
             Section {
                 Toggle("Synced lyrics", isOn: $settings.lyricsEnabled)
                     .disabled(!settings.nowPlayingEnabled)
+                Toggle("Show the line being sung under the closed notch", isOn: $settings.lyricsInClosedNotch)
+                    .disabled(!settings.nowPlayingEnabled || !settings.lyricsEnabled)
             } footer: {
                 Text(
-                    "Shows the words line by line in the open notch. Looks up the song's title, artist, album "
-                        + "and length on lrclib.net, a free lyrics database, and keeps the answer on your Mac. "
-                        + "Nothing else is sent."
+                    "Shows the words line by line in the open notch, and the current line under the closed one "
+                        + "while it's sung. Looks up the song's title, artist, album and length on lrclib.net, "
+                        + "a free lyrics database, and keeps the answer on your Mac. Nothing else is sent."
                 )
             }
             Section {

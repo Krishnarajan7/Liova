@@ -37,8 +37,10 @@ struct BatteryFeatureTests {
     let settings: LiovaSettings
     let source = FakePowerSource(PowerSnapshot(hasBattery: true, percentage: 50, isPluggedIn: false, isCharging: false))
 
+    private let scratch = ScratchDefaults()
+
     init() throws {
-        settings = try LiovaSettings(defaults: #require(UserDefaults(suiteName: "app.liova.tests.\(UUID())")))
+        settings = LiovaSettings(defaults: scratch.defaults)
     }
 
     @Test func pluggingInReachesTheEngine() {

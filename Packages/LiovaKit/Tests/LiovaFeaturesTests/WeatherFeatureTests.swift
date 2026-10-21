@@ -134,8 +134,10 @@ struct WeatherFeatureTests {
     let settings: LiovaSettings
     let clock = Clock()
 
+    private let scratch = ScratchDefaults()
+
     init() throws {
-        settings = try LiovaSettings(defaults: #require(UserDefaults(suiteName: "weather.\(UUID())")))
+        settings = LiovaSettings(defaults: scratch.defaults)
     }
 
     private func feature(_ fetcher: FakeWeather, _ location: FakeLocation) -> WeatherFeature {

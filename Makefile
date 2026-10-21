@@ -60,11 +60,14 @@ bundle-cli: ## Put the `liova` CLI inside the built app (Contents/Helpers) and r
 
 release: ## Build a universal release DMG: make release VERSION=0.2.0
 	@test -n "$(VERSION)" || { echo "Usage: make release VERSION=x.y.z"; exit 2; }
-	$(MAKE) --no-print-directory build bundle-cli CONFIG=Release VERSION=$(VERSION)
+	$(MAKE) --no-print-directory build bundle-cli CONFIG=Release VERSION=$(VERSION) SIGN_IDENTITY=-
+	scripts/release/sign-app.sh "$(DERIVED)/Build/Products/Release/Liova.app" "$(SIGN_IDENTITY)"
 	scripts/release/make-dmg.sh "$(DERIVED)/Build/Products/Release/Liova.app" "$(VERSION)" "$(DERIVED)/release"
 
 run: build bundle-cli ## Build and launch the app (restarts a running copy)
 	-@pkill -x Liova 2>/dev/null; true
+	@# Wait (up to 5 s) for the old copy to finish quitting, or `open` fails with -600.
+	@for _ in $$(seq 50); do pgrep -x Liova >/dev/null || break; sleep 0.1; done
 	open "$(APP)"
 
 perf: ## Measure a Release build against the performance budget (docs/PERFORMANCE.md)

@@ -12,11 +12,13 @@ struct NotchRootView: View {
 
     var body: some View {
         let hasActivity = engine.current != nil
+        let showsDetail = renderers.showsCompactDetail(for: engine.current)
         let isExpanded = model.presentation == .expanded
         let spec = NotchLayout.spec(
             for: model.presentation,
             geometry: model.geometry,
             hasActivity: hasActivity,
+            compactDetail: showsDetail,
             contentHeight: model.fittedContentHeight
         )
         let idleVirtual = !model.geometry.hasHardwareNotch && !model.showsIdleVirtualNotch && !hasActivity
@@ -26,15 +28,21 @@ struct NotchRootView: View {
             NotchShape(topRadius: spec.topRadius, bottomRadius: spec.bottomRadius)
                 .fill(.black)
 
-            content(isExpanded: isExpanded, compactVisible: !isExpanded && !hidden, hasActivity: hasActivity)
-                .frame(width: spec.shapeWidth, height: spec.height, alignment: .top)
-                .clipShape(NotchShape(topRadius: spec.topRadius, bottomRadius: spec.bottomRadius))
+            content(
+                isExpanded: isExpanded,
+                compactVisible: !isExpanded && !hidden,
+                hasActivity: hasActivity,
+                showsDetail: showsDetail
+            )
+            .frame(width: spec.shapeWidth, height: spec.height, alignment: .top)
+            .clipShape(NotchShape(topRadius: spec.topRadius, bottomRadius: spec.bottomRadius))
         }
         .frame(width: spec.shapeWidth, height: spec.height)
         .contentShape(NotchShape(topRadius: spec.topRadius, bottomRadius: spec.bottomRadius))
         .onTapGesture(perform: onTap)
         .opacity(hidden ? 0 : 1)
         .animation(Motion.open, value: hasActivity)
+        .animation(Motion.resize, value: showsDetail)
         .animation(Motion.resize, value: model.fittedContentHeight)
         .animation(.easeInOut(duration: 0.25), value: hidden)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -49,18 +57,25 @@ struct NotchRootView: View {
     /// and is centered at the top; the animating shape only clips it. Content never reflows while the notch grows or
     /// shrinks,
     /// which is what keeps the motion clean.
-    private func content(isExpanded: Bool, compactVisible: Bool, hasActivity: Bool) -> some View {
+    private func content(isExpanded: Bool, compactVisible: Bool, hasActivity: Bool, showsDetail: Bool) -> some View {
         let expanded = NotchLayout.spec(for: .expanded, geometry: model.geometry, hasActivity: hasActivity)
-        let compact = NotchLayout.spec(for: .closed, geometry: model.geometry, hasActivity: hasActivity)
+        let compact = NotchLayout.spec(
+            for: .closed,
+            geometry: model.geometry,
+            hasActivity: hasActivity,
+            compactDetail: showsDetail
+        )
         return ZStack(alignment: .top) {
             if let activity = engine.current {
                 CompactView(
                     activity: activity,
                     renderer: renderers.renderer(for: activity),
-                    notchWidth: model.geometry.notchSize.width,
-                    earWidth: NotchLayout.earWidth(for: model.geometry)
+                    notchSize: model.geometry.notchSize,
+                    earWidth: NotchLayout.earWidth(for: model.geometry),
+                    showsDetail: showsDetail,
+                    detailInset: compact.bottomRadius
                 )
-                .frame(width: compact.bodyWidth, height: model.geometry.notchSize.height)
+                .frame(width: compact.bodyWidth, height: compact.height, alignment: .top)
                 .opacity(isExpanded ? 0 : 1)
                 .scaleEffect(isExpanded ? 0.85 : 1)
                 .animation(isExpanded ? Motion.contentOut : Motion.compactContentIn, value: isExpanded)
@@ -90,17 +105,35 @@ public extension EnvironmentValues {
 }
 
 /// The closed notch with a live activity: an icon in the left ear, status in the right.
-/// The middle stays empty so nothing is drawn under the camera.
+/// The middle stays empty so nothing is drawn under the camera. Some activities add a line
+/// of text in a strip below the camera row.
 struct CompactView: View {
     let activity: Activity
     let renderer: (any ActivityRenderer)?
-    let notchWidth: CGFloat
+    let notchSize: CGSize
     let earWidth: CGFloat
+    let showsDetail: Bool
+    /// Keeps the line clear of the strip's rounded bottom corners.
+    let detailInset: CGFloat
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             renderer?.compactBackground(for: activity)
-            ears
+            VStack(spacing: 0) {
+                ears
+                    .frame(height: notchSize.height)
+                if showsDetail, let detail = renderer?.compactDetail(for: activity) {
+                    detail
+                        .frame(maxWidth: .infinity)
+                        .frame(height: NotchLayout.compactDetailHeight, alignment: .top)
+                        .padding(.horizontal, detailInset)
+                        // Arrives once the strip has mostly grown, leaves before it shrinks.
+                        .transition(.asymmetric(
+                            insertion: .opacity.animation(Motion.expandedContentIn),
+                            removal: .opacity.animation(Motion.contentOut)
+                        ))
+                }
+            }
         }
     }
 
@@ -114,7 +147,7 @@ struct CompactView: View {
                 }
             }
             .frame(width: earWidth)
-            Color.clear.frame(width: notchWidth)
+            Color.clear.frame(width: notchSize.width)
             Group {
                 if let custom = renderer?.compactTrailing(for: activity) {
                     custom

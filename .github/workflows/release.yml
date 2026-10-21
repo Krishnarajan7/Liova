@@ -32,9 +32,10 @@ jobs:
       - name: Run tests
         run: make test
 
-      # Optional: a stable signing identity keeps users' macOS permissions across updates.
-      # Store a self-signed code-signing certificate as LIOVA_SIGNING_P12 (base64) and
-      # LIOVA_SIGNING_PASSWORD. Without them, the build is signed ad-hoc.
+      # The release certificate (scripts/release/create-release-cert.sh). Liova installs an
+      # update by itself only when it's signed with the same certificate as the running
+      # copy, and macOS keeps users' permissions across updates. Without the secrets the
+      # build is signed ad-hoc: it works, but users update by hand.
       - name: Import signing certificate
         id: signing
         env:
@@ -54,7 +55,13 @@ jobs:
           security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -s -k liova "$KEYCHAIN" >/dev/null
           security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
-          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN" | awk -F'"' 'NR==1{print $2}')
+          # Self-signed, so never "valid" (trusted) here; codesign signs with it all the same.
+          # Picked by its SHA-1 so nothing else on the runner can match.
+          IDENTITY=$(security find-identity -p codesigning "$KEYCHAIN" | awk '/"Liova Release"/{print $2; exit}')
+          if [ -z "$IDENTITY" ]; then
+            echo "::error::LIOVA_SIGNING_P12 has no \"Liova Release\" code-signing identity."
+            exit 1
+          fi
           echo "identity=$IDENTITY" >> "$GITHUB_OUTPUT"
 
       - name: Build DMG

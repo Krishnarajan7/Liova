@@ -91,8 +91,10 @@ struct NowPlayingFeatureTests {
     let settings: LiovaSettings
     let feature: NowPlayingFeature
 
+    private let scratch = ScratchDefaults()
+
     init() throws {
-        settings = try LiovaSettings(defaults: #require(UserDefaults(suiteName: "app.liova.tests.\(UUID())")))
+        settings = LiovaSettings(defaults: scratch.defaults)
         feature = NowPlayingFeature(engine: engine, settings: settings, provider: provider, now: { now })
     }
 
