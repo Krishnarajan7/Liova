@@ -1,3 +1,4 @@
+import EventKit
 import Foundation
 @testable import LiovaFeatures
 import Testing
@@ -64,5 +65,27 @@ struct CalendarPolicyTests {
     ])
     func findsMeetingLinks(text: String, found: Bool) {
         #expect((CalendarPolicy.joinURL(url: nil, location: text, notes: nil) != nil) == found)
+    }
+}
+
+struct CalendarAccessTests {
+    @Test func onlyFullAccessReadsEvents() {
+        #expect(CalendarFeature.access(for: .fullAccess) == .granted)
+        // Not asked yet (or macOS couldn't ask): Liova can still ask, so it offers to.
+        #expect(CalendarFeature.access(for: .notDetermined) == .needsPermission)
+        #expect(CalendarFeature.access(for: .writeOnly) == .denied)
+        #expect(CalendarFeature.access(for: .denied) == .denied)
+        #expect(CalendarFeature.access(for: .restricted) == .denied)
+    }
+
+    @Test func theAppIsEntitledToAskForCalendars() throws {
+        // Under the hardened runtime, a missing entitlement makes macOS refuse without asking.
+        // This file is generated from project.yml (`entitlements.properties`); CI checks the signed app too.
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().appendingPathComponent("../../../../App/Liova.entitlements")
+        let plist = try PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil)
+        let entitlements = try #require(plist as? [String: Any])
+        #expect(entitlements["com.apple.security.personal-information.calendars"] as? Bool == true)
+        #expect(entitlements["com.apple.security.personal-information.location"] as? Bool == true)
     }
 }

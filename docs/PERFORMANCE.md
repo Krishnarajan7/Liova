@@ -87,7 +87,7 @@ make perf PERF_ARGS="--timeline 40"                          # CPU and wakeups p
 
 Don't touch the Mac during an idle run: moving the pointer near the notch or switching apps is real work and shows up in the numbers.
 
-**On CI.** The `Performance budget` job runs `make perf` on every push and PR and writes a table to the job summary. Idle CPU, wakeups and memory use the real budget. Launch uses a 1500 ms limit there because GitHub's virtual machines start apps far slower than a Mac; the 300 ms launch budget is checked on real hardware before each release.
+**On CI.** The `Performance budget` job runs `make perf` on every push and PR and writes a table to the job summary. Idle CPU, wakeups and memory use the real budget. Launch uses a 1500 ms limit there because GitHub's virtual machines start apps far slower than a Mac, and idle CPU a 0.25% limit because each wakeup costs a virtual machine several times the CPU (runners measure about 0.1% at 1.7 wakeups per second, where a Mac measures 0.002%). The 300 ms launch and 0.05% CPU budgets are checked on real hardware before each release.
 
 **Animation Hitches.** Locally, profile open/close with the **Animation Hitches** instrument on a 120 Hz display. Any hitch longer than one frame is a bug.
 

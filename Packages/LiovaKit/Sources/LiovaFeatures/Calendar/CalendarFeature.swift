@@ -43,27 +43,49 @@ public final class CalendarFeature {
             stop()
             return
         }
-        switch EKEventStore.authorizationStatus(for: .event) {
-        case .fullAccess:
-            access = .granted
+        access = Self.access(for: EKEventStore.authorizationStatus(for: .event))
+        switch access {
+        case .granted:
             startObserving()
-        case .notDetermined:
-            access = .needsPermission
+        case .needsPermission:
             requestAccess()
-        default:
-            access = .denied
+        case .denied, .off:
+            break
         }
     }
 
+    /// Picks up a change made in System Settings while Liova runs (macOS doesn't announce
+    /// one). Called when the Calendar page appears.
+    public func recheckAccess() {
+        guard settings.calendarEnabled, access != .granted,
+              Self.access(for: EKEventStore.authorizationStatus(for: .event)) == .granted
+        else { return }
+        syncWithSettings()
+    }
+
     public func requestAccess() {
-        store.requestFullAccessToEvents { [weak self] granted, _ in
+        store.requestFullAccessToEvents { [weak self] granted, error in
             Task { @MainActor in
-                guard let self else { return }
-                self.access = granted ? .granted : .denied
+                guard let self, self.settings.calendarEnabled else { return }
+                // Refused without a decision on record means macOS couldn't ask (it never
+                // showed the prompt); leave the way open to ask again rather than pointing
+                // at a Privacy & Security list that doesn't include Liova.
+                self.access = granted ? .granted : Self.access(for: EKEventStore.authorizationStatus(for: .event))
                 if granted {
                     self.startObserving()
+                } else if let error {
+                    Log.feature.error("Calendar access refused: \(error.localizedDescription, privacy: .public)")
                 }
             }
+        }
+    }
+
+    /// Only full access lets Liova read events; write-only is as good as none.
+    nonisolated static func access(for status: EKAuthorizationStatus) -> Access {
+        switch status {
+        case .fullAccess: .granted
+        case .notDetermined: .needsPermission
+        default: .denied
         }
     }
 

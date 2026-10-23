@@ -95,13 +95,20 @@ public struct CalendarPage: View {
                         .foregroundStyle(.blue)
                 }
             case .needsPermission:
-                Message(symbol: "calendar", text: "Waiting for calendar access…")
+                VStack(spacing: 6) {
+                    Message(symbol: "calendar", text: "Liova needs access to your calendars.")
+                    Button("Allow Access…") { feature.requestAccess() }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(.blue)
+                }
             case .off:
                 Message(symbol: "calendar", text: "Turn on Calendar in Liova's Settings to see what's next.")
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding(.top, 4)
+        .onAppear { feature.recheckAccess() }
     }
 }
 

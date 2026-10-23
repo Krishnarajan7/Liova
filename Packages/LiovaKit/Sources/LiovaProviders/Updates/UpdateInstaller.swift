@@ -212,8 +212,8 @@ public struct UpdateInstaller: UpdateInstalling {
     ) throws(Failure) {
         guard let new = Bundle(url: app), let current = Bundle(url: currentApp),
               new.bundleIdentifier != nil, new.bundleIdentifier == current.bundleIdentifier,
-              let version = (new.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)
-                  .flatMap(AppVersion.init), version == release.version
+              let shortVersion = new.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+              AppVersion(shortVersion) == release.version
         else { throw .wrongApp }
         guard CodeSignature.isValid(appAt: app, satisfying: requirement) else { throw .signatureMismatch }
     }

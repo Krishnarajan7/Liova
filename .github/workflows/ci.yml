@@ -14,7 +14,7 @@ jobs:
     name: Lint
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install tools
         run: brew install swiftlint swiftformat
       - name: SwiftLint
@@ -26,7 +26,7 @@ jobs:
     name: Unit tests
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Swift version
         run: swift --version
       - name: Test LiovaKit
@@ -36,7 +36,7 @@ jobs:
     name: Build app
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: CMake version (preinstalled on GitHub macOS runners)
@@ -51,6 +51,15 @@ jobs:
             NSLocationUsageDescription NSLocationWhenInUseUsageDescription; do
             /usr/libexec/PlistBuddy -c "Print :$key" "$plist" > /dev/null || { echo "Missing $key"; exit 1; }
           done
+      - name: Privacy entitlements are in the signature
+        # Under the hardened runtime, macOS refuses calendar or location access without
+        # asking (and never lists Liova in Privacy & Security) unless the entitlement is there.
+        run: |
+          entitlements=$(codesign -d --entitlements - --xml build/Build/Products/Debug/Liova.app 2>/dev/null)
+          for key in com.apple.security.personal-information.calendars \
+            com.apple.security.personal-information.location; do
+            grep -q "<key>$key</key>" <<< "$entitlements" || { echo "Missing entitlement $key"; exit 1; }
+          done
       - name: License notices ship inside the app
         # BSD-3 (mediaremote-adapter) requires its notice in binary distributions.
         run: |
@@ -63,16 +72,18 @@ jobs:
     name: Performance budget
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Measure idle CPU, wakeups, memory and launch (median of 5)
-        # Runners are virtual machines: idle CPU, wakeups and memory are held to the real
-        # budget; launch gets a looser limit because VMs start apps much slower than Macs.
-        run: make perf PERF_ARGS="--runs 5 --seconds 30 --settle 20 --launch-budget 1500 --json build/perf.json"
+        # Runners are virtual machines: wakeups and memory are held to the real budget. Launch
+        # and idle CPU get looser limits: VMs start apps much slower than Macs, and each wakeup
+        # costs a VM several times the CPU (about 0.1% at 1.7 wakeups/s, where a Mac idles at
+        # 0.002%). The real 0.05% CPU budget is checked on a Mac before each release.
+        run: make perf PERF_ARGS="--runs 5 --seconds 30 --settle 20 --launch-budget 1500 --cpu-budget 0.25 --json build/perf.json"
       - name: Keep the measurements
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: perf
           path: build/perf.json

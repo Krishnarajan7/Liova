@@ -109,6 +109,9 @@ targets:
         com.apple.security.app-sandbox: false
         # Hardened runtime blocks Location Services without this. Used only for Weather.
         com.apple.security.personal-information.location: true
+        # Hardened runtime refuses calendar access without this, silently: no prompt, and
+        # Liova never appears in Privacy & Security > Calendars. Used only for Calendar.
+        com.apple.security.personal-information.calendars: true
 
 schemes:
   Liova:

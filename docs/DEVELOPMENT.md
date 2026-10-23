@@ -58,6 +58,8 @@ open Liova.xcodeproj
 
 `Liova.xcodeproj` is **generated** from `project.yml` by XcodeGen and is not committed (it's in `.gitignore`). Don't edit project settings in Xcode's UI; they'll be lost on the next `make setup`. Change `project.yml` instead.
 
+The same goes for `App/Info.plist` and `App/Liova.entitlements`: XcodeGen rewrites both from `project.yml` (`info.properties` and `entitlements.properties`) on every build, so an edit made directly to either file silently disappears. A privacy feature needs both a usage description (`NS…UsageDescription`) and, under the hardened runtime, a `com.apple.security.personal-information.*` entitlement; without the entitlement macOS refuses access without ever asking, and Liova never appears in System Settings → Privacy & Security. CI checks both in the built app.
+
 The `LiovaKit` local package appears in the project navigator. You can also open `Packages/LiovaKit/Package.swift` on its own in Xcode to work on core modules and run their tests without building the app.
 
 ## The `liova` command-line tool

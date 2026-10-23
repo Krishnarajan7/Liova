@@ -29,6 +29,7 @@ struct Options {
     var json: String?
     var timeline: Int?
     var launchBudget = 300.0
+    var cpuBudget = 0.05
     /// Extra launch arguments, e.g. `-headphonesEnabled NO` to measure a feature's cost.
     var appArguments: [String] = []
 }
@@ -46,11 +47,13 @@ func parseOptions() -> Options {
         case "--timeline": options.timeline = Int(args.next() ?? "")
         // CI virtual machines start apps far slower than real Macs; they pass a looser limit.
         case "--launch-budget": options.launchBudget = Double(args.next() ?? "") ?? options.launchBudget
+        // Each wakeup costs a VM several times the CPU it costs a Mac; CI passes a looser idle limit.
+        case "--cpu-budget": options.cpuBudget = Double(args.next() ?? "") ?? options.cpuBudget
         // `--arg -headphonesEnabled --arg NO`: passed to Liova (a settings override for this launch only).
         case "--arg": options.appArguments.append(args.next() ?? "")
         case "-h", "--help":
             print("usage: liova-perf <Liova.app> [--runs N] [--seconds S] [--settle S] [--manual TEXT] "
-                + "[--json FILE] [--launch-budget MS] [--timeline N]")
+                + "[--json FILE] [--launch-budget MS] [--cpu-budget PERCENT] [--timeline N]")
             exit(0)
         default: options.app = arg
         }
@@ -278,7 +281,7 @@ if options.manual == nil {
     checks.append(Check(
         name: "CPU, idle (app + helper)",
         value: median(results.map { $0.cpuPercent + $0.helperCPUPercent }),
-        limit: 0.05,
+        limit: options.cpuBudget,
         unit: "%"
     ))
     checks.append(Check(name: "Wakeups, idle", value: median(results.map(\.wakeupsPerSecond)), limit: 2, unit: "/s"))

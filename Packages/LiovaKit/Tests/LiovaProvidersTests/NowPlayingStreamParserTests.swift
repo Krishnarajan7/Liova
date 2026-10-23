@@ -47,9 +47,9 @@ struct NowPlayingStreamParserTests {
 
     @Test func artworkSurvivesDiffsAndIsDecodedOnce() throws {
         var parser = NowPlayingStreamParser()
+        let diff = line(#"{"type":"data","diff":true,"payload":{"elapsedTime":9}}"#)
         guard case let .info(first?) = try parser.consume(fullPayload),
-              case let .info(second?) = try parser
-                  .consume(line(#"{"type":"data","diff":true,"payload":{"elapsedTime":9}}"#)),
+              case let .info(second?) = try parser.consume(diff),
               let firstArtwork = first.artworkData, let secondArtwork = second.artworkData
         else {
             Issue.record("expected artwork in both")
