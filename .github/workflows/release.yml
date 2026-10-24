@@ -26,6 +26,19 @@ jobs:
       - name: Normalize version
         run: echo "VERSION=${VERSION#v}" >> "$GITHUB_ENV"
 
+      - name: Release notes are in CHANGELOG.md
+        # The version's section of CHANGELOG.md becomes the release notes.
+        run: |
+          awk -v version="$VERSION" '
+            index($0, "## [" version "]") == 1 { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/changes.md"
+          if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/changes.md"; then
+            echo "::error::CHANGELOG.md has no \"## [$VERSION]\" section. Move the [Unreleased] entries under it first."
+            exit 1
+          fi
+
       - name: Install tools
         run: brew install xcodegen swiftlint swiftformat
 
@@ -43,8 +56,14 @@ jobs:
           PASSWORD: ${{ secrets.LIOVA_SIGNING_PASSWORD }}
         run: |
           if [ -z "$P12" ]; then
+            # A tagged release users install must carry the certificate: a copy signed ad-hoc
+            # can never update itself to a signed one, so its users would update by hand forever.
+            if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+              echo "::error::LIOVA_SIGNING_P12 is not set. Run scripts/release/create-release-cert.sh and add the secrets (docs/DISTRIBUTION.md)."
+              exit 1
+            fi
             echo "identity=-" >> "$GITHUB_OUTPUT"
-            echo "No signing certificate configured; signing ad-hoc."
+            echo "No signing certificate configured; signing ad-hoc (manual run, not for users)."
             exit 0
           fi
           KEYCHAIN="$RUNNER_TEMP/liova.keychain-db"
@@ -81,9 +100,8 @@ jobs:
           SHA-256: \`$SHA\`
 
           ## What's new
-
-          _Describe the changes here before publishing._
           NOTES
+          cat "$RUNNER_TEMP/changes.md" >> build/release/notes.md
 
       - name: Create draft release
         env:

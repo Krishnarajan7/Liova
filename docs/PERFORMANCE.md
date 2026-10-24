@@ -83,6 +83,7 @@ Earlier `ps`-based numbers (rounded to 0.1%): music playing with static bars 0.1
 make perf                                                    # 5 × 30 s idle runs
 make perf PERF_ARGS="--runs 3 --manual 'play music'"         # waits for you, then measures
 make perf PERF_ARGS="--timeline 40"                          # CPU and wakeups per second after launch
+scripts/perf/explain-idle.sh build/Build/Products/Release/Liova.app  # what runs while idle: stacks, logs
 ```
 
 Don't touch the Mac during an idle run: moving the pointer near the notch or switching apps is real work and shows up in the numbers.

@@ -1,0 +1,11 @@
+# Keeps the GitHub Actions in .github/workflows current. Liova's Swift package has no
+# dependencies to update; the vendored mediaremote-adapter (Vendor/) is updated by hand.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    labels: ["dependencies", "skip changelog"]
+    commit-message:
+      prefix: ci

@@ -25,14 +25,31 @@ It builds the **universal** (Apple Silicon + Intel) Release app, puts the `liova
 
 On GitHub, pushing a tag runs `.github/workflows/release.yml`:
 
-1. Run the tests; a failure stops the release.
-2. Sign with the release certificate in the `LIOVA_SIGNING_P12` / `LIOVA_SIGNING_PASSWORD` secrets if they exist, otherwise ad-hoc (which works, but users then update by hand).
-3. `make release VERSION=<tag>` and compute the SHA-256.
-4. Create a **draft** GitHub Release with the DMG, the checksum and install notes. Nothing is public until a maintainer edits the notes and clicks **Publish**.
+1. Check that [CHANGELOG.md](../CHANGELOG.md) has a `## [<version>]` section; it becomes the release notes. A missing section stops the release.
+2. Run the tests; a failure stops the release.
+3. Sign with the release certificate in the `LIOVA_SIGNING_P12` / `LIOVA_SIGNING_PASSWORD` secrets. A tag without them stops the release: a copy signed ad-hoc can never update itself to a signed one, so its users would have to update by hand forever. (A manual run from the Actions tab may sign ad-hoc, for testing only.)
+4. `make release VERSION=<tag>` and compute the SHA-256.
+5. Create a **draft** GitHub Release with the DMG, the checksum, install notes and the changelog section. Nothing is public until a maintainer reviews it and clicks **Publish**.
 
 ```bash
 git tag v0.2.0 && git push origin v0.2.0
 ```
+
+### Release checklist
+
+Before tagging:
+
+- [ ] CI is green on `main`.
+- [ ] In [CHANGELOG.md](../CHANGELOG.md), the `[Unreleased]` entries are moved under `## [x.y.z] - YYYY-MM-DD`, and an empty `[Unreleased]` is left on top.
+- [ ] `CURRENT_PROJECT_VERSION` in `project.yml` is one higher than the last release's. (The version number itself comes from the tag.)
+- [ ] `make perf` passes on a real Mac, hands off (the strict budgets CI can't check: 300 ms launch, 0.05% idle CPU).
+- [ ] A clean install works in a second macOS user account: first launch, every permission prompt, the welcome screen.
+- [ ] The previous release updates itself to this one from Settings → Updates (from v0.2.0 on).
+
+After publishing:
+
+- [ ] The README's "Early preview" note and "Get it" section point at the download (first release only).
+- [ ] Issues fixed in this release are closed with a link to it, and the `fixed in next release` label removed.
 
 Not done yet: the Homebrew tap.
 

@@ -17,6 +17,7 @@ Closes #
 - [ ] Every commit is signed off (`git commit -s`) per the [DCO](https://github.com/Krishnarajan7/Liova/blob/main/CONTRIBUTING.md#sign-your-commits-dco).
 - [ ] I followed the [clean-room rule](https://github.com/Krishnarajan7/Liova/blob/main/CONTRIBUTING.md#the-clean-room-rule): no code copied or adapted from GPL/unlicensed sources.
 - [ ] `make format lint test` passes locally.
+- [ ] [CHANGELOG.md](https://github.com/Krishnarajan7/Liova/blob/main/CHANGELOG.md) has a line under [Unreleased], written for users (or the change is invisible to them).
 - [ ] New logic has unit tests.
 - [ ] Performance budget respected: no new polling or timers while idle, no window-frame animation, streaming values bypass animation ([PERFORMANCE.md](https://github.com/Krishnarajan7/Liova/blob/main/docs/PERFORMANCE.md)).
 - [ ] If this touches rendering or idle behaviour, I described how I measured it above.

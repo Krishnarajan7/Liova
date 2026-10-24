@@ -81,9 +81,15 @@ jobs:
         # costs a VM several times the CPU (about 0.1% at 1.7 wakeups/s, where a Mac idles at
         # 0.002%). The real 0.05% CPU budget is checked on a Mac before each release.
         run: make perf PERF_ARGS="--runs 5 --seconds 30 --settle 20 --launch-budget 1500 --cpu-budget 0.25 --json build/perf.json"
+      - name: Explain a missed idle budget
+        # Stacks, per-thread CPU and every log line Liova wrote while it should have been idle.
+        if: failure()
+        run: scripts/perf/explain-idle.sh build/Build/Products/Release/Liova.app build/idle-diagnosis 30
       - name: Keep the measurements
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: perf
-          path: build/perf.json
+          path: |
+            build/perf.json
+            build/idle-diagnosis

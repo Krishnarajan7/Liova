@@ -1,0 +1,59 @@
+name: Pull request
+
+# Checks that only make sense on a pull request (CONTRIBUTING.md):
+# - every commit is signed off under the DCO;
+# - CHANGELOG.md gains a line under [Unreleased], so release notes write themselves. Changes
+#   users won't notice (CI, refactors, tests) take the "skip changelog" label instead.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  dco:
+    name: DCO sign-off
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Every commit has a Signed-off-by matching its author
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          missing=0
+          for commit in $(git rev-list --no-merges "$BASE"..HEAD); do
+            author=$(git log -1 --format='%an <%ae>' "$commit")
+            if ! git log -1 --format='%(trailers:key=Signed-off-by,valueonly)' "$commit" | grep -qxF "$author"; then
+              echo "::error::$(git log -1 --format='%h %s' "$commit") has no \"Signed-off-by: $author\". Fix with: git rebase --signoff $BASE"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+  changelog:
+    name: Changelog entry
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip changelog') }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: CHANGELOG.md has a new line under [Unreleased]
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          added=$(git diff "$BASE"...HEAD -- CHANGELOG.md | grep -E '^\+- ' || true)
+          if [ -z "$added" ]; then
+            echo "::error::Add a line under [Unreleased] in CHANGELOG.md describing this change for users, or ask a maintainer for the \"skip changelog\" label."
+            exit 1
+          fi
+          unreleased=$(awk '/^## \[Unreleased\]/ { found = 1; next } found && /^## \[/ { exit } found' CHANGELOG.md)
+          while IFS= read -r line; do
+            grep -qxF -- "${line#+}" <<< "$unreleased" || {
+              echo "::error::\"${line#+}\" is not under [Unreleased]."
+              exit 1
+            }
+          done <<< "$added"

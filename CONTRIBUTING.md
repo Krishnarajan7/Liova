@@ -32,8 +32,9 @@ make test    # runs swift test in Packages/LiovaKit
 2. Keep each pull request to one logical change. Small PRs get reviewed fast; large ones stall.
 3. For anything bigger than a bug fix, open an issue or a Discussion first so we can agree on the approach before you write code.
 4. Run `make format lint test` before pushing. CI runs the same checks on Apple Silicon and must be green.
-5. Open the PR against `main` and fill in the template. Link the issue it closes.
-6. A maintainer reviews it. We squash-merge, so the PR title becomes the commit message. Write it in the imperative ("Add charging activity", not "Added...").
+5. Add a line for users under **[Unreleased]** in [CHANGELOG.md](CHANGELOG.md): what changed for them, not how. Changes nobody using Liova would notice (CI, refactors, tests) don't need one; a maintainer adds the `skip changelog` label.
+6. Open the PR against `main` and fill in the template. Link the issue it closes.
+7. A maintainer reviews it. We squash-merge, so the PR title becomes the commit message. Write it in the imperative ("Add charging activity", not "Added...").
 
 `main` should always build and pass tests. Release tags (`v0.3.0`) are cut from `main`.
 
@@ -113,6 +114,7 @@ Before you request review:
 
 - [ ] Every commit is signed off (`git commit -s`).
 - [ ] `make format lint test` passes locally.
+- [ ] CHANGELOG.md has a line under [Unreleased] (or the change is invisible to users).
 - [ ] New logic has tests; existing tests still pass.
 - [ ] No new polling, timers, or always-on work while the notch is closed.
 - [ ] No new singletons or app-wide observable state.
