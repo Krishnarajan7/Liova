@@ -16,7 +16,7 @@ jobs:
     name: DCO sign-off
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Every commit has a Signed-off-by matching its author
@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip changelog') }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: CHANGELOG.md has a new line under [Unreleased]
