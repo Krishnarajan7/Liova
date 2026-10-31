@@ -49,7 +49,8 @@ func parseOptions() -> Options {
         case "--launch-budget": options.launchBudget = Double(args.next() ?? "") ?? options.launchBudget
         // Each wakeup costs a VM several times the CPU it costs a Mac; CI passes a looser idle limit.
         case "--cpu-budget": options.cpuBudget = Double(args.next() ?? "") ?? options.cpuBudget
-        // `--arg -headphonesEnabled --arg NO`: passed to Liova (a settings override for this launch only).
+        // `--arg -headphonesEnabled --arg '<false/>'`: passed to Liova (a settings override for this
+        // launch only). Write booleans as plist; a bare NO is read as a string and ignored.
         case "--arg": options.appArguments.append(args.next() ?? "")
         case "-h", "--help":
             print("usage: liova-perf <Liova.app> [--runs N] [--seconds S] [--settle S] [--manual TEXT] "
@@ -132,7 +133,9 @@ func panelIsOnScreen(pid: pid_t) -> Bool {
 }
 
 /// Starts the binary directly (not through `open`) so the launch clock is honest, with
-/// first-run UI turned off through the arguments domain, which leaves saved settings alone.
+/// first-run UI and the daily update check turned off through the arguments domain, which
+/// leaves saved settings alone. Booleans must be written as plist (`<true/>`): Liova reads
+/// settings as `Bool`, and a bare `YES` arrives as a string and is ignored.
 func launch(app: String, arguments: [String] = []) throws -> (Process, launchMilliseconds: Double?) {
     let bundle = URL(fileURLWithPath: app)
     guard let executable = Bundle(url: bundle)?.executableURL else {
@@ -140,7 +143,7 @@ func launch(app: String, arguments: [String] = []) throws -> (Process, launchMil
     }
     let process = Process()
     process.executableURL = executable
-    process.arguments = ["-hasSeenWelcome", "YES"] + arguments
+    process.arguments = ["-hasSeenWelcome", "<true/>", "-automaticUpdateChecks", "<false/>"] + arguments
     process.standardOutput = FileHandle.nullDevice
     process.standardError = FileHandle.nullDevice
     let start = DispatchTime.now()

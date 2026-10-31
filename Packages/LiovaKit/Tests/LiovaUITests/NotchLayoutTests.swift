@@ -151,20 +151,33 @@ struct NotchShapeTests {
     }
 }
 
-struct EqualizerBarsTests {
-    @Test func levelsStayInRangeAndMove() {
+struct MusicWaveTests {
+    @Test func offsetsStayInRangeAndMove() {
         var previous: [CGFloat] = []
         var changes = 0
         for step in 0 ..< 200 {
-            let levels = EqualizerBarsView.levels(at: Double(step) / 10, count: 4)
-            #expect(levels.count == 4)
-            #expect(levels.allSatisfy { $0 >= 0.2 && $0 <= 1 })
-            if !previous.isEmpty, levels != previous {
+            let offsets = MusicWaveView.offsets(at: Double(step) / 10, count: 24)
+            #expect(offsets.count == 24)
+            #expect(offsets.allSatisfy { $0 >= -1 && $0 <= 1 })
+            if !previous.isEmpty, offsets != previous {
                 changes += 1
             }
-            previous = levels
+            previous = offsets
         }
         #expect(changes > 190)
+    }
+
+    @Test func endsStayOnTheMiddleLine() {
+        for step in 0 ..< 50 {
+            let offsets = MusicWaveView.offsets(at: Double(step) / 7, count: 24)
+            #expect(abs(offsets[0]) < 0.001)
+            #expect(abs(offsets[23]) < 0.001)
+        }
+    }
+
+    @Test func theRestingCurveIsAnActualCurve() {
+        let offsets = MusicWaveView.offsets(at: MusicWaveView.restingTime, count: 24)
+        #expect(offsets.map(abs).max() ?? 0 > 0.2)
     }
 }
 
@@ -255,13 +268,13 @@ struct FileDragDetectorTests {
     }
 }
 
-struct EqualizerBarsHealthTests {
+struct MusicWaveHealthTests {
     @Test func aQuietRunningLinkHasStalled() {
-        #expect(EqualizerBarsView.hasStalled(isRunning: true, lastTick: 10, now: 12))
+        #expect(MusicWaveView.hasStalled(isRunning: true, lastTick: 10, now: 12))
     }
 
     @Test func aTickingOrPausedLinkHasNot() {
-        #expect(!EqualizerBarsView.hasStalled(isRunning: true, lastTick: 10, now: 10.5))
-        #expect(!EqualizerBarsView.hasStalled(isRunning: false, lastTick: 10, now: 100))
+        #expect(!MusicWaveView.hasStalled(isRunning: true, lastTick: 10, now: 10.5))
+        #expect(!MusicWaveView.hasStalled(isRunning: false, lastTick: 10, now: 100))
     }
 }

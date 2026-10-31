@@ -35,9 +35,10 @@ public final class NowPlayingRenderer: ActivityRenderer {
         AnyView(NowPlayingCard(feature: feature, lyrics: lyrics))
     }
 
-    /// Lyrics take the room the queue of other activities would use.
-    public func expandedNeedsFullHeight(for _: Activity) -> Bool {
-        lyrics?.lyrics != nil
+    /// Lyrics take most of the room beneath the player: one row is left, so whatever else is
+    /// live (an agent, say) is still a tap away.
+    public func expandedQueueRoom(for _: Activity) -> Int {
+        lyrics?.lyrics != nil ? 1 : 2
     }
 }
 
@@ -68,10 +69,10 @@ private struct ArtworkView: View {
     }
 }
 
-/// Bouncing bars while playing, a pause glyph while paused.
+/// A rippling line in the artwork's colour while playing, a pause glyph while paused.
 ///
-/// The bars are Core Animation layers that the window server animates on its own, so music
-/// playing with the notch closed stays within the 0.5% CPU budget (see `EqualizerBars`).
+/// The line is a Core Animation layer on a capped display link, so music playing with the
+/// notch closed stays within the CPU budget (see `MusicWave`).
 ///
 /// It also keeps the closed notch's lyric line in time: while it's on screen, lyrics schedule
 /// their line changes (see `LyricsFeature`).
@@ -83,8 +84,8 @@ private struct PlayingIndicator: View {
     var body: some View {
         let isPlaying = feature.info?.isPlaying ?? false
         ZStack {
-            EqualizerBars(isAnimating: isPlaying, mode: feature.musicBars, color: .systemPink)
-                .frame(width: 16, height: 13)
+            MusicWave(isAnimating: isPlaying, mode: feature.musicBars, color: feature.artworkTint ?? .systemPink)
+                .frame(width: 22, height: 12)
                 .opacity(isPlaying ? 1 : 0)
             Image(systemName: "pause.fill")
                 .font(.system(size: 12, weight: .semibold))
@@ -105,7 +106,8 @@ private struct CompactLyricLine: View {
         ZStack {
             Text(line)
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.9))
+                // Saying why there are no lyrics is a note, not a line being sung: quieter.
+                .foregroundStyle(.white.opacity(feature.missing == nil ? 0.9 : 0.55))
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .truncationMode(.tail)
@@ -160,9 +162,13 @@ private struct NowPlayingCard: View {
             if let lyrics, let synced = lyrics.lyrics {
                 LyricsLines(feature: lyrics, lyrics: synced)
                     .transition(.opacity.combined(with: .offset(y: 4)))
+            } else if let missing = lyrics?.missing {
+                MissingLyrics(missing: missing)
+                    .transition(.opacity.combined(with: .offset(y: 4)))
             }
         }
         .animation(.easeOut(duration: 0.25), value: lyrics?.lyrics != nil)
+        .animation(.easeOut(duration: 0.25), value: lyrics?.missing)
     }
 
     private var player: some View {
@@ -182,6 +188,7 @@ private struct NowPlayingCard: View {
             }
             Controls(feature: feature, lyrics: lyrics)
         }
+        .trackSwipe(feature)
     }
 }
 
@@ -230,16 +237,30 @@ private struct Controls: View {
     let lyrics: LyricsFeature?
 
     var body: some View {
-        HStack(spacing: 2) {
-            if let lyrics {
-                LyricsToggle(feature: lyrics)
+        // A column as tall as the artwork: playback centred on it, the small toggles along
+        // the bottom with the time labels. No wider than the controls.
+        ZStack {
+            HStack(spacing: 2) {
+                ControlButton(symbol: "backward.fill", size: 14) { feature.previousTrack() }
+                ControlButton(symbol: feature.info?.isPlaying == true ? "pause.fill" : "play.fill", size: 20) {
+                    feature.togglePlayPause()
+                }
+                ControlButton(symbol: "forward.fill", size: 14) { feature.nextTrack() }
             }
-            ControlButton(symbol: "backward.fill", size: 14) { feature.previousTrack() }
-            ControlButton(symbol: feature.info?.isPlaying == true ? "pause.fill" : "play.fill", size: 20) {
-                feature.togglePlayPause()
+            HStack(spacing: 4) {
+                if let lyrics {
+                    LyricsToggle(feature: lyrics)
+                }
+                if let mode = feature.repeatMode {
+                    RepeatButton(feature: feature, mode: mode)
+                        .task(id: feature.info?.title) { await feature.refreshScriptedRepeat() }
+                }
             }
-            ControlButton(symbol: "forward.fill", size: 14) { feature.nextTrack() }
+            .frame(maxHeight: .infinity, alignment: .bottom)
+            // Down to the time labels' line, clear of the play button.
+            .offset(y: 4)
         }
+        .frame(height: 60)
     }
 }
 
@@ -345,41 +366,6 @@ private struct ScrubberSchedule: TimelineSchedule {
         return AnyIterator {
             defer { next += interval }
             return next
-        }
-    }
-}
-
-/// Turns lyrics on and off from the player. Dimmed while on but the song has none.
-private struct LyricsToggle: View {
-    let feature: LyricsFeature
-    @State private var isHovered = false
-
-    var body: some View {
-        let isOn = feature.isEnabled
-        let found = feature.lyrics != nil
-        Button {
-            feature.setEnabled(!isOn)
-        } label: {
-            Image(systemName: "quote.bubble.fill")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(isOn ? (found ? Color.pink : .white.opacity(0.45)) : .white.opacity(0.6))
-                .frame(width: 26, height: 32)
-                .background(Circle().fill(.white.opacity(isHovered ? 0.12 : 0)).frame(width: 26, height: 26))
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovered = $0 }
-        .help(help(isOn: isOn, found: found))
-        .accessibilityLabel(Text("Lyrics"))
-        .accessibilityValue(Text(isOn ? "On" : "Off"))
-    }
-
-    private func help(isOn: Bool, found: Bool) -> String {
-        guard isOn else { return "Show synced lyrics (looks the song up on lrclib.net)" }
-        return switch feature.status {
-        case .loading: "Looking for lyrics…"
-        case .unavailable: "No synced lyrics for this song"
-        default: found ? "Hide lyrics" : "Lyrics are on"
         }
     }
 }

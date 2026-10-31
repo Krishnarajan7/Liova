@@ -59,6 +59,7 @@ final class FakeNowPlaying: NowPlayingProviding {
     private var onChange: (@MainActor (NowPlayingInfo?) -> Void)?
     private(set) var commands: [NowPlayingCommand] = []
     private(set) var seeks: [TimeInterval] = []
+    private(set) var repeats: [RepeatMode] = []
     private(set) var isStarted = false
 
     func start(onChange: @escaping @MainActor (NowPlayingInfo?) -> Void) {
@@ -79,8 +80,50 @@ final class FakeNowPlaying: NowPlayingProviding {
         seeks.append(seconds)
     }
 
+    func setRepeat(_ mode: RepeatMode) {
+        repeats.append(mode)
+    }
+
     func emit(_ info: NowPlayingInfo?) {
         onChange?(info)
+    }
+}
+
+/// Stands in for Spotify's AppleScript: remembers repeat, and can refuse like a user who
+/// said no to Automation.
+final class FakeRepeatScripting: AppRepeatScripting, @unchecked Sendable {
+    private let lock = NSLock()
+    private var state: Bool? = false
+    private var allowed = true
+    private var sets: [Bool] = []
+
+    var setCalls: [Bool] {
+        lock.withLock { sets }
+    }
+
+    func refuse() {
+        lock.withLock { allowed = false; state = nil }
+    }
+
+    func setFromThePlayer(_ isOn: Bool) {
+        lock.withLock { state = isOn }
+    }
+
+    func supports(_ bundleIdentifier: String) -> Bool {
+        bundleIdentifier == "com.spotify.client"
+    }
+
+    func repeating(in _: String) async -> Bool? {
+        lock.withLock { state }
+    }
+
+    func setRepeating(_ isOn: Bool, in _: String) async -> Bool {
+        lock.withLock {
+            sets.append(isOn)
+            guard allowed else { return false }
+            state = isOn
+            return true
+        }
     }
 }
 
@@ -129,6 +172,70 @@ struct NowPlayingFeatureTests {
         #expect(feature.info?.isPlaying == false)
         #expect(provider.commands == [.togglePlayPause])
         #expect(engine.current?.symbol == "pause.fill")
+    }
+
+    @Test func repeatStepsOffAllOneOff() {
+        feature.start()
+        var info = track()
+        info.repeatMode = .off
+        provider.emit(info)
+        feature.cycleRepeat()
+        #expect(feature.info?.repeatMode == .all)
+        feature.cycleRepeat()
+        #expect(feature.info?.repeatMode == .one)
+        feature.cycleRepeat()
+        #expect(feature.info?.repeatMode == .off)
+        #expect(provider.repeats == [.all, .one, .off])
+    }
+
+    @Test func noRepeatForPlayersThatDontReportIt() {
+        feature.start()
+        provider.emit(track())
+        feature.cycleRepeat()
+        #expect(provider.repeats.isEmpty)
+    }
+
+    @Test func spotifyRepeatGoesThroughItsScriptingOnAndOff() async throws {
+        let scripting = FakeRepeatScripting()
+        let feature = NowPlayingFeature(
+            engine: engine, settings: settings, provider: provider, scripting: scripting, now: { now }
+        )
+        feature.start()
+        provider.emit(track())
+        #expect(feature.repeatMode == .off)
+        feature.cycleRepeat()
+        #expect(feature.repeatMode == .all)
+        try await Task.sleep(for: .milliseconds(50))
+        feature.cycleRepeat()
+        #expect(feature.repeatMode == .off)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(scripting.setCalls == [true, false])
+        #expect(provider.repeats.isEmpty)
+    }
+
+    @Test func aChangeMadeInSpotifyShowsWhenTheCardAppears() async {
+        let scripting = FakeRepeatScripting()
+        let feature = NowPlayingFeature(
+            engine: engine, settings: settings, provider: provider, scripting: scripting, now: { now }
+        )
+        feature.start()
+        provider.emit(track())
+        scripting.setFromThePlayer(true)
+        await feature.refreshScriptedRepeat()
+        #expect(feature.repeatMode == .all)
+    }
+
+    @Test func refusedPermissionPutsTheButtonBack() async throws {
+        let scripting = FakeRepeatScripting()
+        scripting.refuse()
+        let feature = NowPlayingFeature(
+            engine: engine, settings: settings, provider: provider, scripting: scripting, now: { now }
+        )
+        feature.start()
+        provider.emit(track())
+        feature.cycleRepeat()
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(feature.repeatMode == .off)
     }
 
     @Test func seekUsesTrackDuration() {

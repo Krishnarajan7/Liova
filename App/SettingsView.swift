@@ -3,40 +3,55 @@ import LiovaFeatures
 import SwiftUI
 
 /// The Settings window's tabs, so other parts of the app can open one.
-enum SettingsTab: Hashable {
+enum SettingsTab: Hashable, CaseIterable {
     case general, activities, huds, weather, agents, updates, about
+
+    var title: String {
+        switch self {
+        case .general: "General"
+        case .activities: "Activities"
+        case .huds: "HUDs"
+        case .weather: "Weather"
+        case .agents: "Agents"
+        case .updates: "Updates"
+        case .about: "About"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .general: "gearshape"
+        case .activities: "bolt.horizontal"
+        case .huds: "speaker.wave.2"
+        case .weather: "cloud.sun"
+        case .agents: "sparkle"
+        case .updates: "arrow.down.circle"
+        case .about: "info.circle"
+        }
+    }
 }
 
-struct SettingsView: View {
-    @Bindable var coordinator: AppCoordinator
+/// One tab of the Settings window (see `SettingsWindow`).
+struct SettingsPane: View {
+    let tab: SettingsTab
+    let coordinator: AppCoordinator
 
     var body: some View {
-        TabView(selection: $coordinator.settingsTab) {
-            GeneralSettings(settings: coordinator.settings, launchAtLogin: coordinator.launchAtLogin)
-                .tabItem { Label("General", systemImage: "gearshape") }
-                .tag(SettingsTab.general)
-            ActivitySettings(settings: coordinator.settings, nowPlaying: coordinator.nowPlaying)
-                .tabItem { Label("Activities", systemImage: "bolt.horizontal") }
-                .tag(SettingsTab.activities)
-            HUDSettings(settings: coordinator.settings, hud: coordinator.hud)
-                .tabItem { Label("HUDs", systemImage: "speaker.wave.2") }
-                .tag(SettingsTab.huds)
-            WeatherSettings(settings: coordinator.settings, weather: coordinator.weather)
-                .tabItem { Label("Weather", systemImage: "cloud.sun") }
-                .tag(SettingsTab.weather)
-            AgentSettings(settings: coordinator.settings)
-                .tabItem { Label("Agents", systemImage: "sparkle") }
-                .tag(SettingsTab.agents)
-            UpdateSettings(settings: coordinator.settings, updates: coordinator.updates)
-                .tabItem { Label("Updates", systemImage: "arrow.down.circle") }
-                .tag(SettingsTab.updates)
-            AboutSettings()
-                .tabItem { Label("About", systemImage: "info.circle") }
-                .tag(SettingsTab.about)
+        content
+            .frame(width: 460)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder private var content: some View {
+        switch tab {
+        case .general: GeneralSettings(settings: coordinator.settings, launchAtLogin: coordinator.launchAtLogin)
+        case .activities: ActivitySettings(settings: coordinator.settings, nowPlaying: coordinator.nowPlaying)
+        case .huds: HUDSettings(settings: coordinator.settings, hud: coordinator.hud)
+        case .weather: WeatherSettings(settings: coordinator.settings, weather: coordinator.weather)
+        case .agents: AgentSettings(settings: coordinator.settings)
+        case .updates: UpdateSettings(settings: coordinator.settings, updates: coordinator.updates)
+        case .about: AboutSettings()
         }
-        .frame(width: 460)
-        .fixedSize(horizontal: false, vertical: true)
-        .onAppear { NSApp.activate() }
     }
 }
 
@@ -91,7 +106,7 @@ private struct ActivitySettings: View {
         Form {
             Section {
                 Toggle("Now Playing", isOn: $settings.nowPlayingEnabled)
-                Picker("Moving music bars", selection: $settings.musicBars) {
+                Picker("Moving music wave", selection: $settings.musicBars) {
                     Text("Always").tag(MusicBarsMode.always)
                     Text("When plugged in").tag(MusicBarsMode.pluggedIn)
                     Text("Off").tag(MusicBarsMode.off)
@@ -245,6 +260,18 @@ private struct AgentSettings: View {
                 Text(
                     "See what your coding agents are doing and approve or deny requests from the notch. "
                         + "If you don't answer, the agent asks in its terminal as usual."
+                )
+            }
+            Section {
+                Picker("While music plays, show", selection: $settings.agentsOverMusic) {
+                    Text("The agent").tag(true)
+                    Text("The music").tag(false)
+                }
+                .disabled(!settings.agentIslandEnabled)
+            } footer: {
+                Text(
+                    "Permission requests and \"Finished\" always show. Whatever isn't in front is a row "
+                        + "beneath it in the open notch: click the row to switch."
                 )
             }
             Section {

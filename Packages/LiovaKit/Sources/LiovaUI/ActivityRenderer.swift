@@ -26,6 +26,9 @@ public protocol ActivityRenderer: AnyObject {
     /// True when the expanded card needs the whole open notch (e.g. a prompt the user must
     /// read and answer), so the queue of other activities is hidden beneath it.
     func expandedNeedsFullHeight(for activity: Activity) -> Bool
+    /// How many other activities fit beneath a tall expanded card (each is one tappable row,
+    /// so the user can switch to it). Ignored when the card needs the full height.
+    func expandedQueueRoom(for activity: Activity) -> Int
 }
 
 public extension ActivityRenderer {
@@ -55,6 +58,10 @@ public extension ActivityRenderer {
 
     func expandedNeedsFullHeight(for _: Activity) -> Bool {
         false
+    }
+
+    func expandedQueueRoom(for _: Activity) -> Int {
+        2
     }
 }
 

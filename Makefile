@@ -23,7 +23,7 @@ XCODEBUILD := xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration $(
 	-derivedDataPath $(DERIVED) -destination 'platform=macOS,arch=$(shell uname -m)' \
 	CODE_SIGN_IDENTITY="$(SIGN_IDENTITY)" $(if $(VERSION),MARKETING_VERSION=$(VERSION),)
 
-.PHONY: help setup project vendor dev-cert build bundle-cli release run perf cli test test-intel lint format format-check clean
+.PHONY: help setup project vendor dev-cert build bundle-cli release run perf cli site test test-intel lint format format-check clean
 
 help: ## Show this help
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-13s\033[0m %s\n", $$1, $$2}'
@@ -82,6 +82,9 @@ cli: ## Build the `liova` command-line tool (universal: Apple Silicon + Intel) i
 	@cp "$$(swift build --package-path $(PACKAGE_DIR) -c release --arch arm64 --arch x86_64 --show-bin-path)/liova" $(DERIVED)/cli/liova
 	@codesign --force -s "$(SIGN_IDENTITY)" $(DERIVED)/cli/liova 2>/dev/null || true
 	@echo "Built $(DERIVED)/cli/liova. Try: $(DERIVED)/cli/liova ping"
+
+site: ## Run the website locally with live reload (site/README.md)
+	cd site && pnpm install && pnpm dev
 
 test: ## Run package unit tests
 	swift test --package-path $(PACKAGE_DIR)

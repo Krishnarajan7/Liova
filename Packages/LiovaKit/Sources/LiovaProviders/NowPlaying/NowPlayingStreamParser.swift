@@ -68,7 +68,8 @@ public struct NowPlayingStreamParser: Sendable {
             timestamp: state["timestamp"]?.string.flatMap(Self.parseDate),
             playbackRate: state["playbackRate"]?.number ?? (isPlaying ? 1 : 0),
             isPlaying: isPlaying,
-            artworkData: artwork
+            artworkData: artwork,
+            repeatMode: state["repeatMode"]?.number.flatMap { RepeatMode(rawValue: Int($0)) }
         )
     }
 

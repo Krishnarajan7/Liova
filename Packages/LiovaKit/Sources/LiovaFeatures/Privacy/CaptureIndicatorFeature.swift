@@ -18,6 +18,9 @@ public final class CaptureIndicatorFeature {
     @ObservationIgnored private let monitor: any CaptureMonitoring
     @ObservationIgnored private let now: @Sendable () -> Date
     @ObservationIgnored private var isRunning = false
+    /// When the camera and microphone last turned off, to tell a restart from a new start.
+    @ObservationIgnored private var cameraOffAt: Date?
+    @ObservationIgnored private var microphoneOffAt: Date?
 
     public init(
         engine: ActivityEngine,
@@ -46,14 +49,25 @@ public final class CaptureIndicatorFeature {
         isRunning = false
         monitor.stop()
         state = .off
+        cameraOffAt = nil
+        microphoneOffAt = nil
         engine.endAll(source: CapturePolicy.source)
     }
 
     func receive(_ new: CaptureState) {
         let old = state
+        let date = now()
         state = new
-        if let flash = CapturePolicy.flash(from: old, to: new, now: now()) {
+        if let flash = CapturePolicy.flash(
+            from: old, to: new, now: date, cameraOffAt: cameraOffAt, microphoneOffAt: microphoneOffAt
+        ) {
             try? engine.start(flash)
+        }
+        if old.isCameraOn, !new.isCameraOn {
+            cameraOffAt = date
+        }
+        if old.isMicrophoneOn, !new.isMicrophoneOn {
+            microphoneOffAt = date
         }
     }
 }
@@ -63,11 +77,24 @@ public enum CapturePolicy {
     public static let source = "system.capture"
     public static let flashID: ActivityID = "system.capture.flash"
     public static let flashDuration: TimeInterval = 3
+    /// Back on within this long of turning off is the same session restarting, not a new
+    /// start: unplugging a headset makes a call app drop its mic and pick up the built-in one.
+    public static let restartGrace: TimeInterval = 5
 
-    /// A brief flash when something turns *on*; nothing when things turn off.
-    public static func flash(from old: CaptureState, to new: CaptureState, now: Date) -> Activity? {
-        let cameraStarted = new.isCameraOn && !old.isCameraOn
-        let micStarted = new.isMicrophoneOn && !old.isMicrophoneOn
+    /// A brief flash when something turns *on*; nothing when things turn off, or when they
+    /// come straight back after a blip.
+    public static func flash(
+        from old: CaptureState,
+        to new: CaptureState,
+        now: Date,
+        cameraOffAt: Date? = nil,
+        microphoneOffAt: Date? = nil
+    ) -> Activity? {
+        func isRestart(_ offAt: Date?) -> Bool {
+            offAt.map { now.timeIntervalSince($0) < restartGrace } ?? false
+        }
+        let cameraStarted = new.isCameraOn && !old.isCameraOn && !isRestart(cameraOffAt)
+        let micStarted = new.isMicrophoneOn && !old.isMicrophoneOn && !isRestart(microphoneOffAt)
         guard cameraStarted || micStarted else { return nil }
         let title = switch (new.isCameraOn, new.isMicrophoneOn) {
         case (true, true): "Camera and microphone on"

@@ -21,12 +21,21 @@ import Observation
 public final class LyricsFeature {
     public enum Status: Equatable {
         case off
-        /// No lookup for this track (nothing playing, no artist, or not song-length).
+        /// Nothing playing.
         case idle
         case loading
         case synced(SyncedLyrics)
-        /// Looked up; there are no synced lyrics for this song.
-        case unavailable
+        /// No synced lyrics for what's playing, and why.
+        case unavailable(Missing)
+    }
+
+    /// Why there are no lyrics, when there aren't.
+    public var missing: Missing? {
+        if case let .unavailable(reason) = status {
+            reason
+        } else {
+            nil
+        }
     }
 
     public private(set) var status: Status = .off
@@ -65,6 +74,8 @@ public final class LyricsFeature {
     @ObservationIgnored private var fetchTask: Task<Void, Never>?
     @ObservationIgnored private var lineTask: Task<Void, Never>?
     @ObservationIgnored private var viewers = 0
+    /// Until when the closed notch says why this song has no lyrics.
+    @ObservationIgnored private var noticeUntil: Date?
 
     /// Wait this long after a track change before asking.
     static let lookupDelay: Duration = .milliseconds(700)
@@ -76,6 +87,8 @@ public final class LyricsFeature {
     static let shortBreak: TimeInterval = 4
     /// How long the last line stays under the closed notch; after that it's the outro.
     static let lastLineHold: TimeInterval = 8
+    /// How long the closed notch says a song has no lyrics, after the lookup.
+    static let noticeDuration: TimeInterval = 4
 
     public init(
         settings: LiovaSettings,
@@ -98,14 +111,16 @@ public final class LyricsFeature {
         }
         let newQuery = info.flatMap(Self.query(for:))
         // Coming from off, settle the status even when there's nothing to look up.
-        if newQuery != query || status == .off {
+        let skipped = newQuery == nil ? info.flatMap(Self.skipReason(for:)) : nil
+        if newQuery != query || status == .off || (newQuery == nil && missing != skipped) {
             query = newQuery
             lineIndex = nil
+            noticeUntil = nil
             if let newQuery {
                 lookUp(newQuery)
             } else {
                 fetchTask?.cancel()
-                status = .idle
+                status = skipped.map(Status.unavailable) ?? .idle
             }
         }
         reschedule()
@@ -146,11 +161,19 @@ public final class LyricsFeature {
 
     /// What to look up, or nil when this isn't something with lyrics.
     static func query(for info: NowPlayingInfo) -> LyricsQuery? {
-        guard let artist = info.artist, !artist.isEmpty, !info.title.isEmpty,
-              let duration = info.duration, songLength.contains(duration),
-              !podcastApps.contains(info.bundleIdentifier)
-        else { return nil }
+        guard skipReason(for: info) == nil, let artist = info.artist, let duration = info.duration else { return nil }
         return LyricsQuery(title: info.title, artist: artist, album: info.album, duration: duration)
+    }
+
+    /// Why `info` isn't looked up, or nil when it is. Nothing to say without a title.
+    static func skipReason(for info: NowPlayingInfo) -> Missing? {
+        guard !info.title.isEmpty else { return nil }
+        if podcastApps.contains(info.bundleIdentifier) {
+            return .podcast
+        }
+        guard let duration = info.duration, songLength.contains(duration) else { return .notASong }
+        guard let artist = info.artist, !artist.isEmpty else { return .noArtist }
+        return nil
     }
 
     static let podcastApps: Set<String> = ["com.apple.podcasts", "fm.overcast.overcast", "com.pocketcasts.mac"]
@@ -198,20 +221,29 @@ public final class LyricsFeature {
             } catch {
                 // Offline or lrclib unreachable: say so for this track, remember nothing.
                 guard !Task.isCancelled else { return }
-                self?.finish(.notFound, for: query)
+                self?.finish(nil, for: query)
             }
         }
     }
 
-    private func finish(_ result: LyricsResult, for query: LyricsQuery) {
+    /// `result` nil means the lookup failed.
+    private func finish(_ result: LyricsResult?, for query: LyricsQuery) {
         guard query == self.query, settings.lyricsEnabled else { return }
-        if case let .synced(lyrics) = result {
+        let missing: Missing
+        switch result {
+        case let .synced(lyrics):
             status = .synced(lyrics)
             Log.feature.info("Lyrics: synced, \(lyrics.lines.count) lines")
-        } else {
-            status = .unavailable
-            Log.feature.info("Lyrics: none for this song")
+            reschedule()
+            return
+        case .instrumental: missing = .instrumental
+        case .unsynced: missing = .unsynced
+        case .notFound: missing = .notFound
+        case nil: missing = .offline
         }
+        status = .unavailable(missing)
+        noticeUntil = info?.isPlaying == true ? now() + Self.noticeDuration : nil
+        Log.feature.info("Lyrics: none for this song (\(String(describing: missing), privacy: .public))")
         reschedule()
     }
 
@@ -221,6 +253,7 @@ public final class LyricsFeature {
         lineTask = nil
         query = nil
         lineIndex = nil
+        noticeUntil = nil
         setCompactLine(nil)
         if status != newStatus {
             status = newStatus
@@ -236,7 +269,7 @@ public final class LyricsFeature {
             if lineIndex != nil {
                 lineIndex = nil
             }
-            setCompactLine(nil)
+            showNoticeIfDue()
             return
         }
         let position = elapsed + Self.lead
@@ -251,6 +284,29 @@ public final class LyricsFeature {
         lineTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(wait), tolerance: .milliseconds(30))
             guard !Task.isCancelled else { return }
+            self?.reschedule()
+        }
+    }
+
+    /// Says under the closed notch why a song that was looked up has no lyrics, for a few
+    /// seconds, then folds the strip away. Shown once per song, and only while it plays.
+    private func showNoticeIfDue() {
+        guard let missing, missing.announces, let until = noticeUntil, info?.isPlaying == true else {
+            setCompactLine(nil)
+            return
+        }
+        let left = until.timeIntervalSince(now())
+        guard left > 0 else {
+            noticeUntil = nil
+            setCompactLine(nil)
+            return
+        }
+        setCompactLine(missing.message)
+        // Runs whether or not the line is on screen, so the strip never stays behind.
+        lineTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(left), tolerance: .milliseconds(100))
+            guard !Task.isCancelled else { return }
+            self?.noticeUntil = nil
             self?.reschedule()
         }
     }

@@ -112,8 +112,6 @@ private struct HomePage: View {
     let engine: ActivityEngine
     let renderers: ActivityRendererRegistry
 
-    private static let maxQueued = 2
-
     var body: some View {
         let now = Date()
         let lasting = engine.activities.filter { !ExpandedView.isBrief($0, now: now) }
@@ -126,11 +124,18 @@ private struct HomePage: View {
                 } else {
                     ActivityCard(activity: current)
                 }
-                let showsQueue = !(renderer?.expandedNeedsFullHeight(for: current) ?? false)
-                let queued = showsQueue ? lasting.dropFirst().prefix(Self.maxQueued) : []
+                let room = renderer?.expandedNeedsFullHeight(for: current) == true
+                    ? 0 : renderer?.expandedQueueRoom(for: current) ?? 2
+                let queued = lasting.dropFirst().prefix(room)
                 if !queued.isEmpty {
-                    VStack(spacing: 6) {
-                        ForEach(queued) { ActivityRow(activity: $0) }
+                    VStack(spacing: 2) {
+                        ForEach(queued) { activity in
+                            ActivityRow(activity: activity) {
+                                withAnimation(.spring(response: 0.32, dampingFraction: 0.9)) {
+                                    engine.bringToFront(activity.id)
+                                }
+                            }
+                        }
                     }
                 }
                 Spacer(minLength: 0)
@@ -270,22 +275,41 @@ private struct ActivityCard: View {
     }
 }
 
+/// Something else that's live. Tapping it brings it to the front, open and closed.
 private struct ActivityRow: View {
     let activity: Activity
+    let bringToFront: () -> Void
+    @State private var isHovered = false
 
     var body: some View {
-        HStack(spacing: 8) {
-            ActivitySymbol(activity: activity, size: 11)
-            Text(activity.title)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white.opacity(0.75))
-                .lineLimit(1)
-            Spacer(minLength: 0)
-            if let progress = activity.progress {
-                ProgressBar(progress: progress, tint: activity.tint.color)
-                    .frame(width: 60)
+        Button(action: bringToFront) {
+            HStack(spacing: 8) {
+                ActivitySymbol(activity: activity, size: 11)
+                Text(activity.title)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(isHovered ? 0.95 : 0.75))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                if let progress = activity.progress {
+                    ProgressBar(progress: progress, tint: activity.tint.color)
+                        .frame(width: 60)
+                }
+                Image(systemName: "arrow.up.left")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .opacity(isHovered ? 1 : 0)
             }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(.white.opacity(isHovered ? 0.1 : 0)))
+            .padding(.horizontal, -6)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .animation(.easeOut(duration: 0.12), value: isHovered)
+        .help("Show \(activity.title) first")
+        .accessibilityHint(Text("Shows this activity first"))
     }
 }
 

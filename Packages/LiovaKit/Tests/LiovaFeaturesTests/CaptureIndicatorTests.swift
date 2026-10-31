@@ -60,6 +60,33 @@ struct CaptureIndicatorTests {
         #expect(off == nil)
     }
 
+    @Test func micBlipWhenHeadsetUnpluggedDoesNotFlash() {
+        let clock = HUDTestClock()
+        let feature = CaptureIndicatorFeature(
+            engine: engine, settings: settings, monitor: monitor, now: { clock.now }
+        )
+        feature.syncWithSettings()
+        monitor.send(CaptureState(isCameraOn: true, isMicrophoneOn: true))
+        engine.endAll(source: CapturePolicy.source)
+        // The headset's mic disappears, then the call picks up the built-in one.
+        clock.advance(0.5)
+        monitor.send(CaptureState(isCameraOn: true, isMicrophoneOn: false))
+        clock.advance(0.5)
+        monitor.send(CaptureState(isCameraOn: true, isMicrophoneOn: true))
+        #expect(engine.current == nil)
+    }
+
+    @Test func turningBackOnLaterFlashesAgain() {
+        let start = Date(timeIntervalSince1970: 1000)
+        let cameraOn = CaptureState(isCameraOn: true, isMicrophoneOn: false)
+        let soon = CapturePolicy.flash(from: .off, to: cameraOn, now: start + 2, cameraOffAt: start)
+        let later = CapturePolicy.flash(
+            from: .off, to: cameraOn, now: start + CapturePolicy.restartGrace, cameraOffAt: start
+        )
+        #expect(soon == nil)
+        #expect(later?.title == "Camera on")
+    }
+
     @Test func disablingStopsAndClears() {
         feature.syncWithSettings()
         monitor.send(CaptureState(isCameraOn: false, isMicrophoneOn: true))

@@ -142,6 +142,12 @@ public final class LiovaSettings {
         didSet { store(agentOpensNotchForApprovals, .agentOpensNotchForApprovals) }
     }
 
+    /// While an agent works and music plays, show the agent (true) or the music (false).
+    /// Permission prompts and "Finished" show either way.
+    public var agentsOverMusic: Bool {
+        didSet { store(agentsOverMusic, .agentsOverMusic) }
+    }
+
     /// Look for a new version once a day (one request to GitHub's public API).
     public var automaticUpdateChecks: Bool {
         didSet { store(automaticUpdateChecks, .automaticUpdateChecks) }
@@ -207,6 +213,7 @@ public final class LiovaSettings {
         rainAlertsEnabled = defaults.object(forKey: Key.rainAlertsEnabled.rawValue) as? Bool ?? true
         agentOpensNotchForApprovals = defaults.object(forKey: Key.agentOpensNotchForApprovals.rawValue) as? Bool
             ?? true
+        agentsOverMusic = defaults.object(forKey: Key.agentsOverMusic.rawValue) as? Bool ?? true
         lowBatteryThreshold = min(max(defaults.object(forKey: Key.lowBatteryThreshold.rawValue) as? Int ?? 20, 5), 50)
         automaticUpdateChecks = defaults.object(forKey: Key.automaticUpdateChecks.rawValue) as? Bool ?? true
         betaUpdates = defaults.object(forKey: Key.betaUpdates.rawValue) as? Bool ?? false
@@ -247,6 +254,7 @@ public final class LiovaSettings {
         case temperatureUnit
         case rainAlertsEnabled
         case agentOpensNotchForApprovals
+        case agentsOverMusic
     }
 
     private func store(_ value: some Any, _ key: Key) {

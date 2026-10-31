@@ -39,7 +39,7 @@ struct FeatureSnapshotExport {
         feature.start()
         var info = NowPlayingInfo(
             bundleIdentifier: "com.spotify.client", title: "Golden Hour", artist: "The Midnight Owls",
-            duration: 241, elapsedTime: 83, timestamp: Date(), isPlaying: true
+            duration: 241, elapsedTime: 83, timestamp: Date(), isPlaying: true, repeatMode: .all
         )
         info.artworkData = Self.gradientPNG()
         provider.emit(info)
@@ -52,6 +52,29 @@ struct FeatureSnapshotExport {
             id: "build", source: "cli", title: "Building Liova", symbol: "hammer.fill", progress: 0.4, tint: .blue
         ))
         try render("media-3-preempted-expanded", .expanded)
+    }
+
+    @Test func songWithoutLyrics() async throws {
+        let provider = FakeNowPlaying()
+        let feature = NowPlayingFeature(engine: engine, settings: settings, provider: provider)
+        settings.lyricsEnabled = true
+        let lyrics = LyricsFeature(
+            settings: settings, fetcher: FakeLyricsFetcher(answer: .notFound), cache: LyricsCache(directory: nil)
+        )
+        renderers.register(NowPlayingRenderer(feature: feature, lyrics: lyrics), forSource: NowPlayingPolicy.source)
+        feature.onInfoChange = { lyrics.update($0) }
+        feature.start()
+        var info = NowPlayingInfo(
+            bundleIdentifier: "com.spotify.client", title: "Dope Track", artist: "Somebody",
+            duration: 200, elapsedTime: 10, timestamp: Date(), isPlaying: true
+        )
+        info.artworkData = Self.gradientPNG()
+        provider.emit(info)
+        for _ in 0 ..< 200 where feature.artwork == nil || !lyrics.showsCompactLine {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        try render("nolyrics-1-closed-notice", .closed)
+        try render("nolyrics-2-expanded", .expanded)
     }
 
     @Test func lyricsUnderTheClosedNotch() async throws {
@@ -90,6 +113,14 @@ struct FeatureSnapshotExport {
         provider.emit(info)
         try render("lyrics-4-closed-short-break", .closed)
         try render("lyrics-5-expanded", .expanded)
+        // An agent working behind the music: one row beneath the lyrics, a click away.
+        try engine.start(Activity(
+            id: "agent", source: "agents", priority: .normal, title: "Claude Code · Liova",
+            subtitle: "Running npm test", symbol: "sparkle", tint: .orange
+        ))
+        let music = try #require(engine.activities.first { $0.source == NowPlayingPolicy.source })
+        engine.bringToFront(music.id)
+        try render("lyrics-6-expanded-agent-behind", .expanded)
     }
 
     @Test func huds() throws {

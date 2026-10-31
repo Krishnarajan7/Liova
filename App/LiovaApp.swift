@@ -10,10 +10,6 @@ struct LiovaApp: App {
         } label: {
             Image(nsImage: MenuBarIcon.image)
         }
-
-        Settings {
-            SettingsView(coordinator: appDelegate.coordinator)
-        }
     }
 }
 
@@ -32,10 +28,8 @@ private struct MenuContent: View {
         }
         Divider()
         Button("Show Demo Activity") { coordinator.runDemo() }
-        SettingsLink {
-            Text("Settings…")
-        }
-        .keyboardShortcut(",")
+        Button("Settings…") { coordinator.showSettings() }
+            .keyboardShortcut(",")
         Divider()
         Button("Quit Liova") { NSApp.terminate(nil) }
             .keyboardShortcut("q")

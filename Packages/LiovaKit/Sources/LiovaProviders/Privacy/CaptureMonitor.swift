@@ -24,124 +24,153 @@ public protocol CaptureMonitoring: AnyObject {
 /// Watches every camera (CoreMediaIO) and every audio input (Core Audio) for "running
 /// somewhere", i.e. in use by any process. Property listeners only: nothing polls, and no
 /// permission is needed because no audio or video is ever read.
+///
+/// The device-list listeners stay put for as long as the monitor runs; only per-device
+/// listeners come and go, and only for devices that actually appeared or disappeared. Device
+/// lists churn in bursts (waking from sleep, a call app adding virtual devices), so changes
+/// are coalesced into one sync. Tearing everything down on every notification used to feed
+/// itself and pin the main thread.
 @MainActor
 public final class SystemCaptureMonitor: CaptureMonitoring {
     private var onChange: (@MainActor (CaptureState) -> Void)?
     private var state = CaptureState.off
-    private struct AudioListener {
-        let object: AudioObjectID
-        let address: AudioObjectPropertyAddress
-        let block: AudioObjectPropertyListenerBlock
-    }
 
-    private struct VideoListener {
-        let object: CMIOObjectID
-        let address: CMIOObjectPropertyAddress
-        let block: CMIOObjectPropertyListenerBlock
-    }
-
-    private var audioListeners: [AudioListener] = []
-    private var videoListeners: [VideoListener] = []
+    private var audioDevicesListener: AudioObjectPropertyListenerBlock?
+    private var cameraDevicesListener: CMIOObjectPropertyListenerBlock?
+    private var audioListeners: [AudioObjectID: AudioObjectPropertyListenerBlock] = [:]
+    private var videoListeners: [CMIOObjectID: CMIOObjectPropertyListenerBlock] = [:]
+    private var pendingSync: Task<Void, Never>?
     private let queue = DispatchQueue.main
+
+    /// How long to wait for a burst of device-list changes to settle.
+    static let syncDelay: Duration = .milliseconds(250)
 
     public init() {}
 
     public func start(onChange: @escaping @MainActor (CaptureState) -> Void) {
         stop()
         self.onChange = onChange
-        rebuildListeners()
+        addDeviceListListeners()
+        syncDeviceListeners()
         refresh()
     }
 
     public func stop() {
-        removeAllListeners()
-        audioListeners.removeAll()
-        videoListeners.removeAll()
+        pendingSync?.cancel()
+        pendingSync = nil
+        removeDeviceListListeners()
+        for device in Array(audioListeners.keys) {
+            removeAudioListener(device)
+        }
+        for camera in Array(videoListeners.keys) {
+            removeVideoListener(camera)
+        }
         onChange = nil
+        state = .off
     }
 
     // MARK: - Listeners
 
-    private func removeAllListeners() {
-        for listener in audioListeners {
-            var address = listener.address
-            AudioObjectRemovePropertyListenerBlock(listener.object, &address, queue, listener.block)
+    private func addDeviceListListeners() {
+        // Devices come and go (AirPods, USB mics, virtual devices): resync when a list changes.
+        let audioBlock: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            MainActor.assumeIsolated { self?.scheduleSync() }
         }
-        for listener in videoListeners {
-            var address = listener.address
-            CMIOObjectRemovePropertyListenerBlock(listener.object, &address, queue, listener.block)
+        var audioAddress = Self.address(kAudioHardwarePropertyDevices)
+        let audioSystem = AudioObjectID(kAudioObjectSystemObject)
+        if AudioObjectAddPropertyListenerBlock(audioSystem, &audioAddress, queue, audioBlock) == noErr {
+            audioDevicesListener = audioBlock
         }
-        audioListeners.removeAll()
-        videoListeners.removeAll()
+
+        let videoBlock: CMIOObjectPropertyListenerBlock = { [weak self] _, _ in
+            MainActor.assumeIsolated { self?.scheduleSync() }
+        }
+        var videoAddress = Self.cmioAddress(CMIOObjectPropertySelector(kCMIOHardwarePropertyDevices))
+        let videoSystem = CMIOObjectID(kCMIOObjectSystemObject)
+        if CMIOObjectAddPropertyListenerBlock(videoSystem, &videoAddress, queue, videoBlock) == noErr {
+            cameraDevicesListener = videoBlock
+        }
     }
 
-    private func rebuildListeners() {
-        removeAllListeners()
-        audioListeners.removeAll()
-        videoListeners.removeAll()
-
-        let changed: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
-            MainActor.assumeIsolated { self?.refresh() }
-        }
-        let devicesChanged: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
-            MainActor.assumeIsolated {
-                self?.rebuildListeners()
-                self?.refresh()
-            }
-        }
-        // Devices come and go (AirPods, USB mics): rebuild when the list changes.
-        addAudioListener(
-            AudioObjectID(kAudioObjectSystemObject),
-            Self.address(kAudioHardwarePropertyDevices),
-            devicesChanged
-        )
-        for device in Self.audioInputDevices() {
-            addAudioListener(device, Self.address(kAudioDevicePropertyDeviceIsRunningSomewhere), changed)
-        }
-
-        let videoChanged: CMIOObjectPropertyListenerBlock = { [weak self] _, _ in
-            MainActor.assumeIsolated { self?.refresh() }
-        }
-        let camerasChanged: CMIOObjectPropertyListenerBlock = { [weak self] _, _ in
-            MainActor.assumeIsolated {
-                self?.rebuildListeners()
-                self?.refresh()
-            }
-        }
-        addVideoListener(
-            CMIOObjectID(kCMIOObjectSystemObject),
-            Self.cmioAddress(CMIOObjectPropertySelector(kCMIOHardwarePropertyDevices)),
-            camerasChanged
-        )
-        for camera in Self.cameras() {
-            addVideoListener(
-                camera,
-                Self.cmioAddress(CMIOObjectPropertySelector(kCMIODevicePropertyDeviceIsRunningSomewhere)),
-                videoChanged
+    private func removeDeviceListListeners() {
+        if let audioDevicesListener {
+            var address = Self.address(kAudioHardwarePropertyDevices)
+            AudioObjectRemovePropertyListenerBlock(
+                AudioObjectID(kAudioObjectSystemObject), &address, queue, audioDevicesListener
             )
         }
+        if let cameraDevicesListener {
+            var address = Self.cmioAddress(CMIOObjectPropertySelector(kCMIOHardwarePropertyDevices))
+            CMIOObjectRemovePropertyListenerBlock(
+                CMIOObjectID(kCMIOObjectSystemObject), &address, queue, cameraDevicesListener
+            )
+        }
+        audioDevicesListener = nil
+        cameraDevicesListener = nil
     }
 
-    private func addAudioListener(
-        _ object: AudioObjectID,
-        _ address: AudioObjectPropertyAddress,
-        _ block: @escaping AudioObjectPropertyListenerBlock
-    ) {
-        var address = address
-        if AudioObjectAddPropertyListenerBlock(object, &address, queue, block) == noErr {
-            audioListeners.append(AudioListener(object: object, address: address, block: block))
+    /// One sync per burst: later notifications while one is pending are dropped.
+    private func scheduleSync() {
+        guard onChange != nil, pendingSync == nil else { return }
+        pendingSync = Task { [weak self] in
+            try? await Task.sleep(for: Self.syncDelay)
+            guard !Task.isCancelled, let self else { return }
+            pendingSync = nil
+            syncDeviceListeners()
+            refresh()
         }
     }
 
-    private func addVideoListener(
-        _ object: CMIOObjectID,
-        _ address: CMIOObjectPropertyAddress,
-        _ block: @escaping CMIOObjectPropertyListenerBlock
-    ) {
-        var address = address
-        if CMIOObjectAddPropertyListenerBlock(object, &address, queue, block) == noErr {
-            videoListeners.append(VideoListener(object: object, address: address, block: block))
+    /// Listens to devices that appeared and forgets those that left. Devices already watched
+    /// are left alone, so an unchanged list costs two lookups and nothing else.
+    private func syncDeviceListeners() {
+        let inputs = Set(Self.audioInputDevices())
+        for device in audioListeners.keys where !inputs.contains(device) {
+            removeAudioListener(device)
         }
+        for device in inputs where audioListeners[device] == nil {
+            addAudioListener(device)
+        }
+
+        let cameras = Set(Self.cameras())
+        for camera in videoListeners.keys where !cameras.contains(camera) {
+            removeVideoListener(camera)
+        }
+        for camera in cameras where videoListeners[camera] == nil {
+            addVideoListener(camera)
+        }
+    }
+
+    private func addAudioListener(_ device: AudioObjectID) {
+        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            MainActor.assumeIsolated { self?.refresh() }
+        }
+        var address = Self.address(kAudioDevicePropertyDeviceIsRunningSomewhere)
+        if AudioObjectAddPropertyListenerBlock(device, &address, queue, block) == noErr {
+            audioListeners[device] = block
+        }
+    }
+
+    private func removeAudioListener(_ device: AudioObjectID) {
+        guard let block = audioListeners.removeValue(forKey: device) else { return }
+        var address = Self.address(kAudioDevicePropertyDeviceIsRunningSomewhere)
+        AudioObjectRemovePropertyListenerBlock(device, &address, queue, block)
+    }
+
+    private func addVideoListener(_ camera: CMIOObjectID) {
+        let block: CMIOObjectPropertyListenerBlock = { [weak self] _, _ in
+            MainActor.assumeIsolated { self?.refresh() }
+        }
+        var address = Self.cmioAddress(CMIOObjectPropertySelector(kCMIODevicePropertyDeviceIsRunningSomewhere))
+        if CMIOObjectAddPropertyListenerBlock(camera, &address, queue, block) == noErr {
+            videoListeners[camera] = block
+        }
+    }
+
+    private func removeVideoListener(_ camera: CMIOObjectID) {
+        guard let block = videoListeners.removeValue(forKey: camera) else { return }
+        var address = Self.cmioAddress(CMIOObjectPropertySelector(kCMIODevicePropertyDeviceIsRunningSomewhere))
+        CMIOObjectRemovePropertyListenerBlock(camera, &address, queue, block)
     }
 
     private func refresh() {

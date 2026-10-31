@@ -103,10 +103,13 @@ jobs:
           NOTES
           cat "$RUNNER_TEMP/changes.md" >> build/release/notes.md
 
+      # The same DMG under a name that never changes, so the website can link straight to
+      # releases/latest/download/Liova.dmg. The updater only reads the versioned one.
       - name: Create draft release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          cp "build/release/Liova-$VERSION.dmg" build/release/Liova.dmg
           gh release create "v$VERSION" \
-            "build/release/Liova-$VERSION.dmg" "build/release/Liova-$VERSION.dmg.sha256" \
+            "build/release/Liova-$VERSION.dmg" "build/release/Liova-$VERSION.dmg.sha256" build/release/Liova.dmg \
             --draft --title "Liova $VERSION" --notes-file build/release/notes.md

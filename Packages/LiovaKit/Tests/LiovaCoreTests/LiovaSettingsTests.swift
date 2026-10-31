@@ -21,6 +21,7 @@ struct LiovaSettingsTests {
         #expect(settings.musicBars == .always)
         #expect(!settings.lyricsEnabled)
         #expect(settings.lyricsInClosedNotch)
+        #expect(settings.agentsOverMusic)
     }
 
     @Test func oldMusicBarsSwitchCarriesOver() {

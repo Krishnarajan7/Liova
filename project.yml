@@ -15,7 +15,7 @@ packages:
 
 settings:
   base:
-    MARKETING_VERSION: 0.1.0
+    MARKETING_VERSION: 1.0.0
     CURRENT_PROJECT_VERSION: 1
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
@@ -82,6 +82,10 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: app.liova.Liova
         PRODUCT_NAME: Liova
         GENERATE_INFOPLIST_FILE: NO
+        # One binary in Debug too. Xcode otherwise splits Debug builds into a stub and a
+        # Liova.debug.dylib, and the hardened runtime won't load that library when it's signed
+        # with the local dev certificate (no Team ID): the app dies at launch, "Library missing".
+        ENABLE_DEBUG_DYLIB: NO
     info:
       path: App/Info.plist
       properties:
@@ -97,6 +101,7 @@ targets:
         NSBluetoothAlwaysUsageDescription: Liova shows your AirPods and other headphones when they connect, with their battery, and lets you switch noise control. It only reads connected audio devices.
         NSLocationUsageDescription: Liova shows the weather where you are. It asks for your approximate location only while Weather is on, and rounds it to about a kilometre before asking Open-Meteo.
         NSLocationWhenInUseUsageDescription: Liova shows the weather where you are. It asks for your approximate location only while Weather is on, and rounds it to about a kilometre before asking Open-Meteo.
+        NSAppleEventsUsageDescription: Liova turns repeat on and off for players that only allow it through their own scripting, like Spotify. It asks the first time you press repeat in the notch, and does nothing else with the player.
         NSCalendarsFullAccessUsageDescription: Liova shows your next meeting in the notch and lists today's events. Events never leave your Mac.
         CFBundleURLTypes:
           - CFBundleURLName: app.liova.Liova
@@ -112,6 +117,9 @@ targets:
         # Hardened runtime refuses calendar access without this, silently: no prompt, and
         # Liova never appears in Privacy & Security > Calendars. Used only for Calendar.
         com.apple.security.personal-information.calendars: true
+        # Hardened runtime blocks Apple Events without this. Used only for repeat in players
+        # that don't offer it to macOS (Spotify), after the user allows it.
+        com.apple.security.automation.apple-events: true
 
 schemes:
   Liova:

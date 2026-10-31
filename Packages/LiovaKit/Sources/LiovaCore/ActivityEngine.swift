@@ -9,6 +9,10 @@ import Observation
 /// activity never changes its place in the stack, so a progress tick cannot steal focus.
 /// When an activity ends or expires, the one beneath it is restored automatically.
 ///
+/// The user can bring an activity to the front from the open notch (`bringToFront`). It then
+/// ranks above everything but urgent activities (`.high` and up, like an agent asking for
+/// permission), until it ends or the user picks another.
+///
 /// Expiry is event-driven: one task sleeps until the next deadline. Nothing polls.
 @MainActor
 @Observable
@@ -37,6 +41,9 @@ public final class ActivityEngine {
     public var current: Activity? {
         activities.first
     }
+
+    /// The activity the user brought to the front, while it's live.
+    public private(set) var frontID: ActivityID?
 
     @ObservationIgnored private var startSequence: [ActivityID: UInt64] = [:]
     @ObservationIgnored private var nextSequence: UInt64 = 0
@@ -99,6 +106,14 @@ public final class ActivityEngine {
         commit(activities.filter { $0.source != source })
     }
 
+    /// Shows `id` first until it ends or another is brought to the front. Urgent activities
+    /// still come over it, and it returns when they end.
+    public func bringToFront(_ id: ActivityID) {
+        guard activities.contains(where: { $0.id == id }) else { return }
+        frontID = id
+        commit(activities)
+    }
+
     public func activity(_ id: ActivityID) -> Activity? {
         activities.first { $0.id == id }
     }
@@ -117,10 +132,21 @@ public final class ActivityEngine {
 
     // MARK: - Internals
 
+    /// Just below urgent: where an activity the user brought to the front ranks.
+    static let frontPriority = ActivityPriority(rawValue: ActivityPriority.high.rawValue - 1)
+
+    private func rank(_ activity: Activity) -> ActivityPriority {
+        activity.id == frontID ? max(activity.priority, Self.frontPriority) : activity.priority
+    }
+
     private func commit(_ candidates: [Activity]) {
+        if let frontID, !candidates.contains(where: { $0.id == frontID }) {
+            self.frontID = nil
+        }
         let sorted = candidates.sorted { lhs, rhs in
-            if lhs.priority != rhs.priority {
-                return lhs.priority > rhs.priority
+            let (left, right) = (rank(lhs), rank(rhs))
+            if left != right {
+                return left > right
             }
             return startSequence[lhs.id, default: 0] > startSequence[rhs.id, default: 0]
         }

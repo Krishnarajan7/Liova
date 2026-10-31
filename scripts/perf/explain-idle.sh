@@ -14,7 +14,7 @@ settle=20
 executable="$app/Contents/MacOS/Liova"
 mkdir -p "$out"
 
-"$executable" -hasSeenWelcome YES > /dev/null 2>&1 &
+"$executable" -hasSeenWelcome "<true/>" -automaticUpdateChecks "<false/>" > /dev/null 2>&1 &
 pid=$!
 trap 'kill $pid 2> /dev/null || true' EXIT
 echo "Liova started (pid $pid); settling for $settle s"

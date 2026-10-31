@@ -140,19 +140,15 @@ struct UpdateFeatureTests {
         )
     }
 
-    private func settle() async throws {
-        try await Task.sleep(for: .milliseconds(60))
-    }
-
     @Test func checksByThemselvesByDefault() {
         #expect(settings.automaticUpdateChecks)
         #expect(!settings.betaUpdates)
     }
 
-    @Test func findsAnUpdateAndSaysSoOnce() async throws {
+    @Test func findsAnUpdateAndSaysSoOnce() async {
         let updates = feature(FakeReleases([release("0.2.0")]))
         updates.check(isManual: false)
-        try await settle()
+        await updates.finishWork()
         #expect(updates.status == .available(release("0.2.0")))
         #expect(updates.availableRelease?.version == AppVersion("0.2.0"))
         #expect(engine.activity(UpdatePolicy.activityID)?.title == "Liova 0.2.0 is available")
@@ -160,75 +156,75 @@ struct UpdateFeatureTests {
 
         engine.end(UpdatePolicy.activityID)
         updates.check(isManual: false)
-        try await settle()
+        await updates.finishWork()
         #expect(engine.activity(UpdatePolicy.activityID) == nil)
     }
 
-    @Test func upToDate() async throws {
+    @Test func upToDate() async {
         let updates = feature(FakeReleases([release("0.1.0")]))
         updates.checkNow()
-        try await settle()
+        await updates.finishWork()
         #expect(updates.status == .upToDate)
         #expect(updates.availableRelease == nil)
     }
 
-    @Test func skippedVersionsStayQuietUntilAskedFor() async throws {
+    @Test func skippedVersionsStayQuietUntilAskedFor() async {
         let updates = feature(FakeReleases([release("0.2.0")]))
         settings.skippedUpdateVersion = "0.2.0"
         updates.check(isManual: false)
-        try await settle()
+        await updates.finishWork()
         #expect(updates.status == .upToDate)
         #expect(engine.activity(UpdatePolicy.activityID) == nil)
 
         updates.checkNow()
-        try await settle()
+        await updates.finishWork()
         #expect(updates.availableRelease?.version == AppVersion("0.2.0"))
         #expect(engine.activity(UpdatePolicy.activityID) == nil)
     }
 
-    @Test func skipping() async throws {
+    @Test func skipping() async {
         let updates = feature(FakeReleases([release("0.2.0")]))
         updates.checkNow()
-        try await settle()
+        await updates.finishWork()
         updates.skip()
         #expect(settings.skippedUpdateVersion == "0.2.0")
         #expect(updates.status == .upToDate)
         #expect(engine.activity(UpdatePolicy.activityID) == nil)
     }
 
-    @Test func offlineIsQuietUnlessAsked() async throws {
+    @Test func offlineIsQuietUnlessAsked() async {
         let fetcher = FakeReleases([])
         fetcher.answer = .failure(URLError(.notConnectedToInternet))
         let updates = feature(fetcher)
         updates.check(isManual: false)
-        try await settle()
+        await updates.finishWork()
         #expect(updates.status == .idle)
         updates.checkNow()
-        try await settle()
+        await updates.finishWork()
         #expect(updates.status == .failed(nil, message: "Couldn't reach GitHub to check for updates."))
     }
 
-    @Test func anOfferSurvivesAFailedRecheck() async throws {
+    @Test func anOfferSurvivesAFailedRecheck() async {
         let fetcher = FakeReleases([release("0.2.0")])
         let updates = feature(fetcher)
         updates.checkNow()
-        try await settle()
+        await updates.finishWork()
         fetcher.answer = .failure(URLError(.timedOut))
         updates.checkNow()
-        try await settle()
+        await updates.finishWork()
         #expect(updates.status == .available(release("0.2.0")))
     }
 
-    @Test func installsInPlaceThenQuits() async throws {
+    @Test func installsInPlaceThenQuits() async {
         let installer = FakeInstaller()
         let recorder = Recorder()
         let updates = feature(FakeReleases([release("0.2.0")]), installer, recorder: recorder)
         updates.checkNow()
-        try await settle()
+        await updates.finishWork()
         updates.install()
         #expect(updates.status.isBusy)
         #expect(engine.activity(UpdatePolicy.activityID)?.progress == 0)
-        try await settle()
+        await updates.finishWork()
         #expect(installer.steps == [
             "download 0.2.0", "prepare 0.2.0", "install /tmp/staged/Liova.app -> /Applications/Liova.app",
         ])
@@ -237,16 +233,16 @@ struct UpdateFeatureTests {
         #expect(recorder.opened.isEmpty)
     }
 
-    @Test func aCopyThatCantReplaceItselfOpensTheInstaller() async throws {
+    @Test func aCopyThatCantReplaceItselfOpensTheInstaller() async {
         let installer = FakeInstaller()
         installer.support = .adHocBuild
         let recorder = Recorder()
         let updates = feature(FakeReleases([release("0.2.0")]), installer, recorder: recorder)
         #expect(updates.inPlaceSupport == .adHocBuild)
         updates.checkNow()
-        try await settle()
+        await updates.finishWork()
         updates.install()
-        try await settle()
+        await updates.finishWork()
         #expect(installer.steps == ["download 0.2.0"])
         #expect(recorder.opened == [URL(filePath: "/tmp/Liova-0.2.0.dmg")])
         #expect(recorder.quits == 0)
@@ -254,15 +250,15 @@ struct UpdateFeatureTests {
         #expect(engine.activity(UpdatePolicy.activityID) == nil)
     }
 
-    @Test func aRejectedSignatureStopsTheUpdate() async throws {
+    @Test func aRejectedSignatureStopsTheUpdate() async {
         let installer = FakeInstaller()
         installer.prepareResult = .failure(.signatureMismatch)
         let recorder = Recorder()
         let updates = feature(FakeReleases([release("0.2.0")]), installer, recorder: recorder)
         updates.checkNow()
-        try await settle()
+        await updates.finishWork()
         updates.install()
-        try await settle()
+        await updates.finishWork()
         #expect(installer.steps == ["download 0.2.0", "prepare 0.2.0"])
         #expect(recorder.quits == 0)
         #expect(updates.status == .failed(release("0.2.0"), message: UpdateInstaller.Failure.signatureMismatch.message))

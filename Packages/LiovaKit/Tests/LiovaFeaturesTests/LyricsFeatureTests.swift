@@ -149,7 +149,7 @@ struct LyricsFeatureTests {
         settings.lyricsEnabled = true
         feature.update(song())
         try await settle()
-        #expect(feature.status == .unavailable)
+        #expect(feature.status == .unavailable(.unsynced))
         #expect(feature.lyrics == nil)
     }
 
@@ -158,7 +158,7 @@ struct LyricsFeatureTests {
         settings.lyricsEnabled = true
         feature.update(song())
         try await settle()
-        #expect(feature.status == .unavailable)
+        #expect(feature.status == .unavailable(.offline))
         await fetcher.setFails(false)
         feature.update(song("Other"))
         feature.update(song())
@@ -166,16 +166,30 @@ struct LyricsFeatureTests {
         #expect(feature.lyrics == synced)
     }
 
-    @Test func thingsThatAreNotSongsAreSkipped() async throws {
+    @Test func thingsThatAreNotSongsAreSkippedAndSayWhy() async throws {
         settings.lyricsEnabled = true
         feature.update(song(duration: nil))
+        #expect(feature.missing == .notASong)
         feature.update(song(duration: 3600 * 2))
+        #expect(feature.missing == .notASong)
         var podcast = song()
         podcast.bundleIdentifier = "com.apple.podcasts"
         feature.update(podcast)
+        #expect(feature.missing == .podcast)
+        var video = song()
+        video.artist = nil
+        feature.update(video)
+        #expect(feature.missing == .noArtist)
         try await settle()
-        #expect(feature.status == .idle)
         #expect(await fetcher.queries.isEmpty)
+        // Said only in the open notch: videos and podcasts would flash it every time.
+        #expect(!feature.showsCompactLine)
+    }
+
+    @Test func nothingPlayingIsIdle() {
+        settings.lyricsEnabled = true
+        feature.update(nil)
+        #expect(feature.status == .idle)
     }
 
     @Test func turningOffClears() async throws {
@@ -282,6 +296,47 @@ struct LyricsFeatureTests {
         try await Task.sleep(for: .milliseconds(450))
         #expect(!feature.showsCompactLine)
         feature.viewerLeft()
+    }
+}
+
+/// Saying why a song has no lyrics.
+extension LyricsFeatureTests {
+    @Test func instrumentalAndNotFoundSayWhich() async throws {
+        settings.lyricsEnabled = true
+        await fetcher.setAnswerForTest(.instrumental)
+        feature.update(song())
+        try await settle()
+        #expect(feature.missing == .instrumental)
+        await fetcher.setAnswerForTest(.notFound)
+        feature.update(song("Other"))
+        try await settle()
+        #expect(feature.missing == .notFound)
+    }
+
+    @Test func theClosedNotchSaysSoBrieflyThenFolds() async throws {
+        await fetcher.setAnswerForTest(.notFound)
+        settings.lyricsEnabled = true
+        feature.update(song())
+        try await settle()
+        #expect(feature.showsCompactLine)
+        #expect(feature.compactLine == "No lyrics found for this song")
+        clock.now += LyricsFeature.noticeDuration + 0.1
+        feature.update(song(elapsed: LyricsFeature.noticeDuration + 0.1))
+        #expect(!feature.showsCompactLine)
+    }
+
+    @Test func noNoticeWhilePausedOrWithTheLineTurnedOff() async throws {
+        await fetcher.setAnswerForTest(.notFound)
+        settings.lyricsEnabled = true
+        feature.update(song(playing: false))
+        try await settle()
+        #expect(feature.missing == .notFound)
+        #expect(!feature.showsCompactLine)
+
+        settings.lyricsInClosedNotch = false
+        feature.update(song("Other"))
+        try await settle()
+        #expect(!feature.showsCompactLine)
     }
 }
 

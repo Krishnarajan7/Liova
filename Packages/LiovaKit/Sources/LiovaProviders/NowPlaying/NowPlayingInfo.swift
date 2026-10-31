@@ -20,6 +20,8 @@ public struct NowPlayingInfo: Equatable, Sendable {
     public var isPlaying: Bool
     /// Encoded artwork image (JPEG or PNG), when the player provides one.
     public var artworkData: Data?
+    /// The player's repeat setting; nil when it doesn't say (then Liova offers no button).
+    public var repeatMode: RepeatMode?
 
     public init(
         bundleIdentifier: String,
@@ -32,7 +34,8 @@ public struct NowPlayingInfo: Equatable, Sendable {
         timestamp: Date? = nil,
         playbackRate: Double = 1,
         isPlaying: Bool,
-        artworkData: Data? = nil
+        artworkData: Data? = nil,
+        repeatMode: RepeatMode? = nil
     ) {
         self.bundleIdentifier = bundleIdentifier
         self.parentBundleIdentifier = parentBundleIdentifier
@@ -45,6 +48,7 @@ public struct NowPlayingInfo: Equatable, Sendable {
         self.playbackRate = playbackRate
         self.isPlaying = isPlaying
         self.artworkData = artworkData
+        self.repeatMode = repeatMode
     }
 
     /// The elapsed time at `date`, extrapolated from the last sample while playing.
@@ -77,6 +81,22 @@ public enum NowPlayingCommand: Int, Sendable, CaseIterable {
     case previousTrack = 5
 }
 
+/// Repeat, as MediaRemote counts it.
+public enum RepeatMode: Int, Sendable, CaseIterable {
+    case off = 1
+    case one = 2
+    case all = 3
+
+    /// The next one a repeat button goes to, as in Music: off, all, one, off.
+    public var next: RepeatMode {
+        switch self {
+        case .off: .all
+        case .all: .one
+        case .one: .off
+        }
+    }
+}
+
 /// A source of Now Playing data. Behind a protocol so the implementation can change
 /// (Apple may close today's route) without touching the feature or UI.
 @MainActor
@@ -87,4 +107,5 @@ public protocol NowPlayingProviding: AnyObject {
     func send(_ command: NowPlayingCommand)
     /// Seeks the current track to `seconds`.
     func seek(to seconds: TimeInterval)
+    func setRepeat(_ mode: RepeatMode)
 }

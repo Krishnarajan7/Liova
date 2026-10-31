@@ -106,6 +106,10 @@ public final class MediaRemoteAdapterProvider: NowPlayingProviding {
         runOneShot(["send", String(command.rawValue)])
     }
 
+    public func setRepeat(_ mode: RepeatMode) {
+        runOneShot(["repeat", String(mode.rawValue)])
+    }
+
     public func seek(to seconds: TimeInterval) {
         guard seconds.isFinite, seconds >= 0 else { return }
         runOneShot(["seek", String(Int64(seconds * 1_000_000))])

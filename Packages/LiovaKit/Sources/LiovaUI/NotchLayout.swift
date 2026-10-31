@@ -32,7 +32,7 @@ public struct NotchSpec: Equatable, Sendable {
 public enum NotchLayout {
     /// Size of the expanded notch body at its tallest. It fits its content, so a one-line
     /// card gets a short notch instead of a slab of empty black.
-    public static let expandedBodySize = CGSize(width: 480, height: 124)
+    public static let expandedBodySize = CGSize(width: 480, height: 152)
     /// The shortest the open notch gets below the camera row.
     public static let minExpandedBodyHeight: CGFloat = 64
     /// Room around the expanded notch for its shadow. Part of the fixed panel.
@@ -42,7 +42,7 @@ public enum NotchLayout {
     /// The strip a closed notch grows under the camera row for one line of text (the lyric
     /// being sung): its height, and how much wider than the ears it reaches on each side.
     public static let compactDetailHeight: CGFloat = 22
-    public static let compactDetailOverhang: CGFloat = 36
+    public static let compactDetailOverhang: CGFloat = 72
 
     /// The fixed panel size for a display: big enough for the largest state, never resized.
     public static func panelSize(for geometry: NotchGeometry) -> CGSize {

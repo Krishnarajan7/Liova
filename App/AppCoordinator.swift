@@ -15,9 +15,8 @@ final class AppCoordinator {
     let settings = LiovaSettings()
     let engine = ActivityEngine()
     let launchAtLogin = LaunchAtLogin()
-    /// Which Settings tab is showing; set before opening Settings to land on one.
-    var settingsTab: SettingsTab = .general
 
+    @ObservationIgnored private lazy var settingsWindow = SettingsWindow(coordinator: self)
     @ObservationIgnored private let displayManager = DisplayManager()
     @ObservationIgnored private let renderers = ActivityRendererRegistry()
     @ObservationIgnored private let chrome = NotchChrome()
@@ -46,7 +45,8 @@ final class AppCoordinator {
     @ObservationIgnored private(set) lazy var nowPlaying = NowPlayingFeature(
         engine: engine,
         settings: settings,
-        provider: MediaRemoteAdapterProvider.Location.bundled().map { MediaRemoteAdapterProvider(location: $0) }
+        provider: MediaRemoteAdapterProvider.Location.bundled().map { MediaRemoteAdapterProvider(location: $0) },
+        scripting: AppleScriptRepeat()
     )
     @ObservationIgnored private lazy var battery = BatteryFeature(
         engine: engine,
@@ -111,6 +111,7 @@ final class AppCoordinator {
                 settings.lyricsInClosedNotch,
                 settings.hudReplacementEnabled,
                 settings.agentIslandEnabled,
+                settings.agentsOverMusic,
                 settings.downloadsEnabled,
                 settings.telegramDownloadsEnabled,
                 settings.captureIndicatorEnabled,
@@ -276,11 +277,7 @@ final class AppCoordinator {
 extension AppCoordinator {
     /// Opens Settings, on `tab` when given.
     func showSettings(tab: SettingsTab? = nil) {
-        if let tab {
-            settingsTab = tab
-        }
-        NSApp.activate()
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        settingsWindow.show(tab: tab)
     }
 
     /// A short, self-ending activity so new users can see what Liova does.

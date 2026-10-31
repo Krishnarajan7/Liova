@@ -147,7 +147,7 @@ struct CompactView: View {
                 }
             }
             .frame(width: earWidth)
-            Color.clear.frame(width: notchSize.width)
+            Spacer(minLength: notchSize.width)
             Group {
                 if let custom = renderer?.compactTrailing(for: activity) {
                     custom
@@ -157,6 +157,9 @@ struct CompactView: View {
             }
             .frame(width: earWidth)
         }
+        // With the strip below, the notch is wider than the ears: they move out to its edges
+        // so the shape reads as one card instead of icons adrift in black.
+        .padding(.horizontal, showsDetail ? detailInset / 2 : 0)
         .frame(maxWidth: .infinity)
     }
 }

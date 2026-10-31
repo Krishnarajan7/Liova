@@ -1,0 +1,103 @@
+@import "tailwindcss";
+@import "@fontsource-variable/figtree/wght.css";
+@import "@fontsource-variable/bricolage-grotesque/standard.css";
+@import "@fontsource-variable/caveat/wght.css";
+
+/*
+ * Liova's own look: cool paper, true black (the notch's colour) and ballpoint-pen blue for
+ * everything written by hand. Bricolage Grotesque for headlines, Figtree for text, and Caveat
+ * for the handwritten notes, echoing the script "Li" in the app icon. All bundled, all OFL.
+ */
+@theme {
+  --font-sans: "Figtree Variable", system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque Variable", "Figtree Variable", system-ui, sans-serif;
+  --font-hand: "Caveat Variable", "Bradley Hand", cursive;
+  --font-rounded: "Figtree Variable", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --color-paper: #f4f3ef;
+  --color-paper-deep: #e9e7e0;
+  --color-card: #fbfaf7;
+  --color-ink: #121212;
+  --color-ink-soft: #57564f;
+  --color-ink-faint: #9b9990;
+  --color-line: #dedbd2;
+  --color-notch: #000000;
+  --color-pen: #2f54eb;
+  --color-pen-soft: #c9d4ff;
+  --color-ember: #ff6a1f;
+  --color-leaf: #30c85a;
+  --color-sky: #0a84ff;
+  --color-plum: #a259ff;
+  --color-rose: #ff375f;
+  --color-marker: #c9d4ff;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer base {
+  html {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  html,
+  body {
+    overflow-x: clip;
+  }
+  html.lenis,
+  html.lenis body {
+    height: auto;
+  }
+  .lenis.lenis-smooth {
+    scroll-behavior: auto !important;
+  }
+  ::selection {
+    background: var(--color-pen-soft);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-pen);
+    outline-offset: 3px;
+    border-radius: 10px;
+  }
+}
+
+@layer components {
+  /* Headlines: Bricolage Grotesque, slightly condensed and tight. */
+  .display {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-stretch: 88%;
+    letter-spacing: -0.035em;
+    line-height: 0.98;
+    text-wrap: balance;
+  }
+  .hand {
+    font-family: var(--font-hand);
+    font-weight: 600;
+    color: var(--color-pen);
+    line-height: 1.05;
+  }
+  .numeric {
+    font-variant-numeric: tabular-nums;
+  }
+  .label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--color-ink-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

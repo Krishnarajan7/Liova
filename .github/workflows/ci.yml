@@ -79,8 +79,9 @@ jobs:
         # Runners are virtual machines: wakeups and memory are held to the real budget. Launch
         # and idle CPU get looser limits: VMs start apps much slower than Macs, and each wakeup
         # costs a VM several times the CPU (about 0.1% at 1.7 wakeups/s, where a Mac idles at
-        # 0.002%). The real 0.05% CPU budget is checked on a Mac before each release.
-        run: make perf PERF_ARGS="--runs 5 --seconds 30 --settle 20 --launch-budget 1500 --cpu-budget 0.25 --json build/perf.json"
+        # 0.002%). The real 0.05% CPU budget is checked on a Mac before each release. Liova
+        # settles slower on a VM, so measuring starts 40 s after launch instead of 20.
+        run: make perf PERF_ARGS="--runs 5 --seconds 30 --settle 40 --launch-budget 1500 --cpu-budget 0.25 --json build/perf.json"
       - name: Explain a missed idle budget
         # Stacks, per-thread CPU and every log line Liova wrote while it should have been idle.
         if: failure()

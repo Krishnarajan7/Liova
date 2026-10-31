@@ -67,20 +67,26 @@ public enum AgentIslandPolicy {
 
     // MARK: - Activities
 
-    public static func sessionActivity(for session: AgentSession, now: Date) -> Activity? {
+    /// Where a working or waiting agent ranks when the user puts music first: just below
+    /// music (`.low`), so the song stays in front and the agent is a row beneath it.
+    public static let behindMusic = ActivityPriority(rawValue: ActivityPriority.low.rawValue - 10)
+
+    /// `overMusic` false puts working and waiting sessions behind music. Finished stays
+    /// urgent either way, as do permission prompts (`promptActivity`).
+    public static func sessionActivity(for session: AgentSession, now: Date, overMusic: Bool = true) -> Activity? {
         let name = displayName(forAgent: session.agent)
         let title = session.project.map { "\(name) · \($0)" } ?? name
         let id = sessionActivityID(agent: session.agent, sessionID: session.sessionID)
         switch session.state {
         case .working:
             return Activity(
-                id: id, source: source, priority: .normal, title: title,
+                id: id, source: source, priority: overMusic ? .normal : behindMusic, title: title,
                 subtitle: session.detail ?? "Working…", symbol: "sparkle",
                 tint: tint(forAgent: session.agent), expiresAt: now + staleAfter
             )
         case .waitingForUser:
             return Activity(
-                id: id, source: source, priority: .low, title: title,
+                id: id, source: source, priority: overMusic ? .low : behindMusic, title: title,
                 subtitle: "Waiting for you", symbol: "ellipsis.bubble.fill",
                 tint: tint(forAgent: session.agent), expiresAt: now + staleAfter
             )

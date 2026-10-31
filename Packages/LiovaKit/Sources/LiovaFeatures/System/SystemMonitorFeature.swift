@@ -33,8 +33,10 @@ public final class SystemMonitorFeature {
         viewers += 1
         guard samplingTask == nil else { return }
         let reader = reader
-        _ = reader.sample() // prime the CPU tick baseline
         samplingTask = Task { [weak self] in
+            // Prime the CPU tick baseline. Off the main thread: the GPU read goes through
+            // IOKit, and the page shouldn't wait on the driver to open.
+            await Task.detached(priority: .utility) { _ = reader.sample() }.value
             while !Task.isCancelled {
                 try? await Task.sleep(for: Self.interval, tolerance: .milliseconds(200))
                 guard !Task.isCancelled else { return }

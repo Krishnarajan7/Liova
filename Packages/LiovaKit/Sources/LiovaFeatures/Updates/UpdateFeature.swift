@@ -149,6 +149,11 @@ public final class UpdateFeature {
 
     // MARK: - Internals
 
+    /// Waits for the check or install under way, if any. For tests, which otherwise race it.
+    func finishWork() async {
+        await workTask?.value
+    }
+
     func check(isManual: Bool) {
         guard !status.isBusy, let currentVersion else { return }
         // An offer already on screen stays put while looking again.

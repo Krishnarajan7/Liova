@@ -46,6 +46,7 @@ Liova is a menu-bar agent (`LSUIElement`), so it has no Dock icon. Look at the n
 | `make lint` | Runs SwiftLint in strict mode. Must pass with zero warnings. |
 | `make format` | Runs SwiftFormat over the repo, rewriting files in place. |
 | `make clean` | Removes build products and the generated Xcode project. |
+| `make site` | Runs the website locally with live reload (needs Node 20.19+ and pnpm; see [site/README.md](../site/README.md)). |
 
 Before pushing, run `make format lint test`. CI runs the same checks.
 
@@ -98,7 +99,8 @@ Liova/
 │   └─ Tests/...                # swift test
 │   (Features/* and Providers/* become additional targets in this package later)
 ├─ .github/workflows/ci.yml  # build + swift test + swiftlint on macos-26 (Apple Silicon)
-└─ docs/
+├─ site/                  # the website (React + TypeScript + Vite), published to GitHub Pages
+└─ docs/                  # these docs; docs/images holds the README pictures
 ```
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for what goes where and which modules may depend on which.

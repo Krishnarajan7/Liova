@@ -54,6 +54,34 @@ struct AgentIslandTests {
         #expect(engine.current?.priority == .normal)
     }
 
+    @Test func musicFirstPutsAWorkingAgentBehindTheSong() throws {
+        settings.agentsOverMusic = false
+        try engine.start(Activity(id: "media", source: "media", priority: .low, title: "Dope Track"))
+        feature.handle(event(.working))
+        #expect(engine.current?.id == "media")
+        #expect(engine.activities.count == 2)
+    }
+
+    @Test func musicFirstStillLetsFinishedThrough() throws {
+        settings.agentsOverMusic = false
+        try engine.start(Activity(id: "media", source: "media", priority: .low, title: "Dope Track"))
+        feature.handle(event(.working))
+        feature.handle(event(.finished))
+        #expect(engine.current?.source == AgentIslandPolicy.source)
+    }
+
+    @Test func changingTheChoiceReranksLiveSessions() throws {
+        try engine.start(Activity(id: "media", source: "media", priority: .low, title: "Dope Track"))
+        feature.handle(event(.working))
+        #expect(engine.current?.source == AgentIslandPolicy.source)
+        settings.agentsOverMusic = false
+        feature.syncWithSettings()
+        #expect(engine.current?.id == "media")
+        settings.agentsOverMusic = true
+        feature.syncWithSettings()
+        #expect(engine.current?.source == AgentIslandPolicy.source)
+    }
+
     @Test func finishedFlashesThenExpires() throws {
         feature.handle(event(.working))
         feature.handle(event(.finished))

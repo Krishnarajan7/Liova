@@ -25,6 +25,8 @@ public final class AgentIslandFeature {
     @ObservationIgnored private let now: @Sendable () -> Date
     @ObservationIgnored private var waiters: [UUID: CheckedContinuation<AgentDecision, Never>] = [:]
     @ObservationIgnored private var deadlines: [UUID: Task<Void, Never>] = [:]
+    /// The "agents over music" choice the live sessions were published with.
+    @ObservationIgnored private var publishedOverMusic: Bool?
 
     public static let maxSessions = 32
     public static let maxPrompts = 8
@@ -39,10 +41,21 @@ public final class AgentIslandFeature {
         settings.agentIslandEnabled
     }
 
-    /// Clears everything when the feature is turned off.
+    /// Clears everything when the feature is turned off; re-ranks live sessions when the
+    /// user changes whether agents or music come first.
     public func syncWithSettings() {
-        guard !settings.agentIslandEnabled else { return }
-        stop()
+        guard settings.agentIslandEnabled else {
+            stop()
+            return
+        }
+        guard let publishedOverMusic, publishedOverMusic != settings.agentsOverMusic else { return }
+        // Only sessions still in the notch, at their own times, so nothing stale comes back.
+        for session in sessions.values {
+            let id = AgentIslandPolicy.sessionActivityID(agent: session.agent, sessionID: session.sessionID)
+            if engine.activity(id) != nil {
+                publish(session, at: session.updatedAt)
+            }
+        }
     }
 
     /// Answers every waiting prompt with `.ask` and clears all agent activities.
@@ -156,7 +169,9 @@ public final class AgentIslandFeature {
     // MARK: - Internals
 
     private func publish(_ session: AgentSession, at date: Date) {
-        guard let activity = AgentIslandPolicy.sessionActivity(for: session, now: date) else { return }
+        publishedOverMusic = settings.agentsOverMusic
+        let activity = AgentIslandPolicy.sessionActivity(for: session, now: date, overMusic: settings.agentsOverMusic)
+        guard let activity else { return }
         do {
             try engine.start(activity)
         } catch {

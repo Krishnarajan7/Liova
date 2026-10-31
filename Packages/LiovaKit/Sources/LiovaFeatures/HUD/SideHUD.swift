@@ -63,6 +63,27 @@ public final class SideHUDController {
             model.isVisible = true
         }
         scheduleHide()
+        logPlacement(panel, moment: "shown")
+        Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard let self, let panel = self.panel else { return }
+            logPlacement(panel, moment: "settled")
+        }
+    }
+
+    /// Where the bar is and whether macOS considers it visible, for diagnosing a bar that
+    /// doesn't appear (e.g. over a full-screen app).
+    private func logPlacement(_ panel: NSPanel, moment: String) {
+        let frame = NSStringFromRect(panel.frame)
+        let screen = NSStringFromRect(panel.screen?.frame ?? .zero)
+        let visible = panel.occlusionState.contains(.visible)
+        Log.display.notice(
+            """
+            Side HUD \(moment, privacy: .public): frame \(frame, privacy: .public), \
+            screen \(screen, privacy: .public), onActiveSpace \(panel.isOnActiveSpace), \
+            visible \(visible), window \(panel.windowNumber), alpha \(panel.alphaValue)
+            """
+        )
     }
 
     public func hide() {

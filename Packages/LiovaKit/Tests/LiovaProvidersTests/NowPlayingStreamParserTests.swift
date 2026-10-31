@@ -45,6 +45,21 @@ struct NowPlayingStreamParserTests {
         #expect(info.playbackRate == 0)
     }
 
+    @Test func repeatModeIsReadWhenThePlayerReportsIt() throws {
+        var parser = NowPlayingStreamParser()
+        guard case let .info(before?) = try parser.consume(fullPayload) else {
+            Issue.record("expected info")
+            return
+        }
+        #expect(before.repeatMode == nil)
+        let output = try parser.consume(line(#"{"type":"data","diff":true,"payload":{"repeatMode":3}}"#))
+        guard case let .info(info?) = output else {
+            Issue.record("expected info")
+            return
+        }
+        #expect(info.repeatMode == .all)
+    }
+
     @Test func artworkSurvivesDiffsAndIsDecodedOnce() throws {
         var parser = NowPlayingStreamParser()
         let diff = line(#"{"type":"data","diff":true,"payload":{"elapsedTime":9}}"#)

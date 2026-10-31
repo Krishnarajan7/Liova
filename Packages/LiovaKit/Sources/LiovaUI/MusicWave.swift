@@ -3,40 +3,39 @@ import IOKit.ps
 import LiovaCore
 import SwiftUI
 
-/// A small animated level meter for "music is playing".
+/// A small rippling line for "music is playing", tinted by the caller (Now Playing uses a
+/// colour from the album art). Paused or resting, it holds still as a gentle curve.
 ///
 /// Driven by a display link with continuous motion, capped at 30 fps plugged in and 20 fps
 /// on battery: smooth, at a fraction of the system cost of 60 fps. It runs only while music
 /// plays, the notch is visible, Low Power Mode is off and `mode` allows it on the current
-/// power source; otherwise the bars rest.
+/// power source; otherwise the line rests.
 ///
 /// It heals itself: a display link can go quiet after sleep or a display change, and macOS
 /// doesn't always say the window is visible again after waking. So while music plays a
-/// slow check makes sure the bars are doing what they should, and wake or a display
+/// slow check makes sure the line is doing what it should, and wake or a display
 /// change starts them over.
-public struct EqualizerBars: NSViewRepresentable {
+public struct MusicWave: NSViewRepresentable {
     public var isAnimating: Bool
     public var mode: MusicBarsMode
     public var color: NSColor
-    public var barCount: Int
 
-    public init(isAnimating: Bool, mode: MusicBarsMode = .always, color: NSColor, barCount: Int = 4) {
+    public init(isAnimating: Bool, mode: MusicBarsMode = .always, color: NSColor) {
         self.isAnimating = isAnimating
         self.mode = mode
         self.color = color
-        self.barCount = barCount
     }
 
-    public func makeNSView(context _: Context) -> EqualizerBarsView {
-        EqualizerBarsView(barCount: barCount)
+    public func makeNSView(context _: Context) -> MusicWaveView {
+        MusicWaveView()
     }
 
-    public func updateNSView(_ view: EqualizerBarsView, context: Context) {
+    public func updateNSView(_ view: MusicWaveView, context: Context) {
         view.update(color: color, isAnimating: isAnimating && context.environment.notchCompactVisible, mode: mode)
     }
 }
 
-public final class EqualizerBarsView: NSView {
+public final class MusicWaveView: NSView {
     /// Smooth, continuous motion at 30 fps. Measured on a MacBook Air M4 (WindowServer CPU
     /// added while music plays): 60 fps +7.5%, 30 fps +3.7%, 10 discrete steps +4% but
     /// visibly choppy. 30 fps reads as fluid on a 16 pt meter at half the cost of 60.
@@ -49,13 +48,18 @@ public final class EqualizerBarsView: NSView {
         return (source as String) == kIOPMBatteryPowerKey
     }
 
-    nonisolated static let restingLevel: CGFloat = 0.3
-    /// How often, while music plays, the bars check they're in the right state.
+    /// Points sampled along the line; enough for a smooth curve 24 pt wide.
+    nonisolated static let sampleCount = 24
+    /// The moment the resting curve is taken from, at the amplitude it rests at.
+    nonisolated static let restingTime: Double = 0.9
+    nonisolated static let restingAmplitude: CGFloat = 0.45
+    static let lineWidth: CGFloat = 2
+    /// How often, while music plays, the line checks it.s in the right state.
     static let checkInterval: TimeInterval = 4
     /// A running link that hasn't ticked for this long has gone quiet.
     nonisolated static let stallAfter: CFTimeInterval = 1
 
-    private var bars: [CALayer] = []
+    private let line = CAShapeLayer()
     private var isAnimating = false
     private var mode: MusicBarsMode = .always
     private var color: NSColor = .white
@@ -66,18 +70,17 @@ public final class EqualizerBarsView: NSView {
     private var lastTick: CFTimeInterval = 0
     private var checkTimer: Timer?
 
-    init(barCount: Int) {
+    init() {
         super.init(frame: .zero)
         wantsLayer = true
-        for _ in 0 ..< max(barCount, 1) {
-            let bar = CALayer()
-            bar.anchorPoint = CGPoint(x: 0.5, y: 0)
-            bar.actions = ["transform": NSNull(), "bounds": NSNull(), "position": NSNull()]
-            bar.transform = CATransform3DMakeScale(1, Self.restingLevel, 1)
-            layer?.addSublayer(bar)
-            bars.append(bar)
-        }
-        // Low Power Mode means the user wants battery over flourish: rest the bars.
+        line.fillColor = nil
+        line.lineWidth = Self.lineWidth
+        line.lineCap = .round
+        line.lineJoin = .round
+        // The path changes every frame and must not animate; the colour may (a new song).
+        line.actions = ["path": NSNull(), "bounds": NSNull(), "position": NSNull()]
+        layer?.addSublayer(line)
+        // Low Power Mode means the user wants battery over flourish: rest the line.
         observers.append((NotificationCenter.default, NotificationCenter.default.addObserver(
             forName: .NSProcessInfoPowerStateDidChange, object: nil, queue: .main
         ) { [weak self] _ in
@@ -120,17 +123,11 @@ public final class EqualizerBarsView: NSView {
 
     override public func layout() {
         super.layout()
-        let count = CGFloat(bars.count)
-        let gap: CGFloat = 2
-        let width = max(1.5, (bounds.width - gap * (count - 1)) / count)
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        for (index, bar) in bars.enumerated() {
-            bar.bounds = CGRect(x: 0, y: 0, width: width, height: bounds.height)
-            bar.position = CGPoint(x: CGFloat(index) * (width + gap) + width / 2, y: 0)
-            bar.cornerRadius = width / 2
+        line.frame = bounds
+        line.contentsScale = window?.backingScaleFactor ?? 2
+        if !isLinkRunning {
+            rest()
         }
-        CATransaction.commit()
     }
 
     func update(color: NSColor, isAnimating: Bool, mode: MusicBarsMode) {
@@ -150,7 +147,7 @@ public final class EqualizerBarsView: NSView {
         syncAnimation()
     }
 
-    /// Plugging in or unplugging changes the frame rate, or whether the bars move at all.
+    /// Plugging in or unplugging changes the frame rate, or whether the line moves at all.
     /// macOS fires this only when the power source state changes, so it costs nothing at rest.
     private func watchPowerSource(_ watch: Bool) {
         guard watch != (powerSource != nil) else { return }
@@ -162,7 +159,7 @@ public final class EqualizerBarsView: NSView {
         let context = Unmanaged.passUnretained(self).toOpaque()
         guard let source = IOPSNotificationCreateRunLoopSource({ context in
             guard let context else { return }
-            let view = Unmanaged<EqualizerBarsView>.fromOpaque(context).takeUnretainedValue()
+            let view = Unmanaged<MusicWaveView>.fromOpaque(context).takeUnretainedValue()
             MainActor.assumeIsolated { view.syncAnimation() }
         }, context)?.takeRetainedValue() else { return }
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
@@ -204,10 +201,11 @@ public final class EqualizerBarsView: NSView {
         syncAnimation()
     }
 
+    /// A new song's colour fades in rather than snapping.
     private func applyColor() {
         CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        bars.forEach { $0.backgroundColor = color.cgColor }
+        CATransaction.setAnimationDuration(0.4)
+        line.strokeColor = color.cgColor
         CATransaction.commit()
     }
 
@@ -232,7 +230,7 @@ public final class EqualizerBarsView: NSView {
             link?.isPaused = false
         } else {
             link?.isPaused = true
-            setLevels(Array(repeating: Self.restingLevel, count: bars.count))
+            rest()
         }
         watchHealth(isAnimating && window != nil && mode != .off)
     }
@@ -268,7 +266,7 @@ public final class EqualizerBarsView: NSView {
 
     private func healIfStalled() {
         if Self.hasStalled(isRunning: isLinkRunning, lastTick: lastTick, now: CACurrentMediaTime()) {
-            Log.display.notice("Music bars: display link went quiet, restarting")
+            Log.display.notice("Music wave: display link went quiet, restarting")
             restartAnimation()
         } else {
             // Catches a missed "visible again" after wake: resumes if it should be running.
@@ -283,26 +281,46 @@ public final class EqualizerBarsView: NSView {
 
     @objc private func tick() {
         lastTick = CACurrentMediaTime()
-        setLevels(Self.levels(at: CACurrentMediaTime() - startTime, count: bars.count))
+        draw(Self.offsets(at: CACurrentMediaTime() - startTime, count: Self.sampleCount))
     }
 
-    private func setLevels(_ levels: [CGFloat]) {
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        for (bar, level) in zip(bars, levels) {
-            bar.transform = CATransform3DMakeScale(1, level, 1)
+    /// Still, as a soft curve: paused, hidden, Low Power Mode or turned off.
+    private func rest() {
+        let offsets = Self.offsets(at: Self.restingTime, count: Self.sampleCount)
+        draw(offsets.map { $0 * Self.restingAmplitude })
+    }
+
+    /// Draws `offsets` (−1…1 from the middle) as a smooth line across the view.
+    private func draw(_ offsets: [CGFloat]) {
+        guard offsets.count > 1, bounds.width > 0 else { return }
+        let inset = Self.lineWidth / 2
+        let step = (bounds.width - 2 * inset) / CGFloat(offsets.count - 1)
+        let half = bounds.height / 2 - inset
+        let points = offsets.enumerated().map { index, offset in
+            CGPoint(x: inset + CGFloat(index) * step, y: bounds.midY + offset * half)
         }
-        CATransaction.commit()
+        // Through the midpoints, with each sample as a control point: smooth, no overshoot.
+        let path = CGMutablePath()
+        path.move(to: points[0])
+        for index in 1 ..< points.count - 1 {
+            let (here, next) = (points[index], points[index + 1])
+            path.addQuadCurve(to: CGPoint(x: (here.x + next.x) / 2, y: (here.y + next.y) / 2), control: here)
+        }
+        path.addLine(to: points[points.count - 1])
+        line.path = path
     }
 
-    /// Bar heights at a moment: two overlapping waves per bar with different speeds, so the
-    /// motion is continuous (smooth at any frame rate) yet never looks mechanical.
-    nonisolated static func levels(at time: Double, count: Int) -> [CGFloat] {
-        (0 ..< count).map { index in
-            let seed = Double(index) * 1.7
-            let wave = sin(time * (5.1 + seed) + seed) * 0.5 + sin(time * (8.3 - seed * 0.6) + seed * 2) * 0.3
-            let normalized = (wave + 0.8) / 1.6 // roughly 0…1
-            return CGFloat(min(max(0.25 + normalized * 0.75, 0.2), 1))
+    /// The line's height along its length at a moment, −1…1 from the middle: two travelling
+    /// waves under an envelope that pins both ends to the middle, with a slowly breathing
+    /// amplitude. Continuous in time, so it's smooth at any frame rate, and never repeats
+    /// exactly, so it doesn't look mechanical.
+    nonisolated static func offsets(at time: Double, count: Int) -> [CGFloat] {
+        let amplitude = 0.55 + 0.45 * (0.5 + 0.5 * sin(time * 1.3)) * (0.6 + 0.4 * sin(time * 2.1 + 0.7))
+        return (0 ..< count).map { index in
+            let x = count > 1 ? Double(index) / Double(count - 1) : 0.5
+            let envelope = pow(sin(Double.pi * x), 1.5)
+            let wave = 0.6 * sin(2 * .pi * 1.6 * x - time * 4.2) + 0.4 * sin(2 * .pi * 2.7 * x + time * 2.9 + 1.3)
+            return CGFloat(min(max(envelope * amplitude * wave, -1), 1))
         }
     }
 }

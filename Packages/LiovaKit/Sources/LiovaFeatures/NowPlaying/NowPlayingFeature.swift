@@ -15,12 +15,33 @@ public final class NowPlayingFeature {
     public private(set) var info: NowPlayingInfo?
     /// Downsampled artwork, decoded off the main thread.
     public private(set) var artwork: NSImage?
+    /// The art's most vivid colour, for the closed notch's music wave; `nil` without colour.
+    public private(set) var artworkTint: NSColor?
     public private(set) var isRunning = false
 
     /// False when the adapter isn't bundled or keeps failing; the settings UI says so.
     /// When the closed-notch music bars should move (a user preference).
     public var musicBars: MusicBarsMode {
         settings.musicBars
+    }
+
+    /// Repeat for the player, wherever it comes from: what the player reports to macOS, or,
+    /// for players that don't (Spotify), what its AppleScript says. Nil means no repeat button.
+    public var repeatMode: RepeatMode? {
+        guard let info else { return nil }
+        if let reported = info.repeatMode {
+            return reported
+        }
+        guard scripting?.supports(info.bundleIdentifier) == true else { return nil }
+        return scriptedRepeat ?? .off
+    }
+
+    /// Repeat read from the player's AppleScript (on or off only).
+    private(set) var scriptedRepeat: RepeatMode?
+
+    /// Whether gestures in the player give a trackpad tick (a user preference).
+    public var hapticsEnabled: Bool {
+        settings.hapticsEnabled
     }
 
     public var isAvailable: Bool {
@@ -33,6 +54,7 @@ public final class NowPlayingFeature {
     @ObservationIgnored private let engine: ActivityEngine
     @ObservationIgnored private let settings: LiovaSettings
     @ObservationIgnored private let provider: (any NowPlayingProviding)?
+    @ObservationIgnored private let scripting: (any AppRepeatScripting)?
     @ObservationIgnored private let now: @Sendable () -> Date
     @ObservationIgnored private var artworkSource: Data?
     @ObservationIgnored private var artworkTask: Task<Void, Never>?
@@ -44,11 +66,13 @@ public final class NowPlayingFeature {
         engine: ActivityEngine,
         settings: LiovaSettings,
         provider: (any NowPlayingProviding)?,
+        scripting: (any AppRepeatScripting)? = nil,
         now: @escaping @Sendable () -> Date = Date.init
     ) {
         self.engine = engine
         self.settings = settings
         self.provider = provider
+        self.scripting = scripting
         self.now = now
     }
 
@@ -76,6 +100,7 @@ public final class NowPlayingFeature {
         artworkTask?.cancel()
         info = nil
         artwork = nil
+        artworkTint = nil
         artworkSource = nil
         onInfoChange?(nil)
         engine.endAll(source: NowPlayingPolicy.source)
@@ -101,6 +126,45 @@ public final class NowPlayingFeature {
 
     public func previousTrack() {
         provider?.send(.previousTrack)
+    }
+
+    /// Steps repeat on, as in Music: off, all, one, off. Players scripted instead (Spotify)
+    /// only go on and off.
+    public func cycleRepeat() {
+        guard var current = info else { return }
+        if let mode = current.repeatMode {
+            // Optimistic, like play/pause: the stream confirms a moment later.
+            current.repeatMode = mode.next
+            apply(current)
+            provider?.setRepeat(mode.next)
+            return
+        }
+        guard let scripting, scripting.supports(current.bundleIdentifier) else { return }
+        let target: RepeatMode = repeatMode == .off ? .all : .off
+        let bundle = current.bundleIdentifier
+        scriptedRepeat = target
+        Task { [weak self] in
+            // The first time, macOS asks the user to let Liova control the player.
+            let took = await scripting.setRepeating(target != .off, in: bundle)
+            guard let self, info?.bundleIdentifier == bundle else { return }
+            if !took {
+                Log.feature.notice("Repeat: \(bundle, privacy: .public) can't be scripted (not allowed?)")
+                await refreshScriptedRepeat()
+            }
+        }
+    }
+
+    /// Reads a scripted player's repeat, never asking for permission. Call when the player
+    /// card appears or the track changes, so a change made in the player itself shows.
+    public func refreshScriptedRepeat() async {
+        guard let info, let scripting, scripting.supports(info.bundleIdentifier) else {
+            scriptedRepeat = nil
+            return
+        }
+        let bundle = info.bundleIdentifier
+        let isOn = await scripting.repeating(in: bundle)
+        guard self.info?.bundleIdentifier == bundle else { return }
+        scriptedRepeat = isOn.map { $0 ? .all : .off }
     }
 
     /// Seeks to a fraction (0…1) of the current track.
@@ -145,17 +209,19 @@ public final class NowPlayingFeature {
         artworkTask?.cancel()
         guard let data else {
             artwork = nil
+            artworkTint = nil
             return
         }
         artworkTask = Task { [weak self] in
-            let image = await Self.decodeArtwork(data)
+            let decoded = await Self.decodeArtwork(data)
             guard let self, !Task.isCancelled, artworkSource == data else { return }
-            artwork = image
+            artwork = decoded?.image
+            artworkTint = decoded?.tint
         }
     }
 
-    /// Decodes and downsamples artwork in one ImageIO pass, off the main actor.
-    @concurrent nonisolated static func decodeArtwork(_ data: Data) async -> NSImage? {
+    /// Decodes and downsamples artwork in one ImageIO pass, and picks its tint, off the main actor.
+    @concurrent nonisolated static func decodeArtwork(_ data: Data) async -> (image: NSImage, tint: NSColor?)? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
@@ -164,6 +230,7 @@ public final class NowPlayingFeature {
             kCGImageSourceShouldCacheImmediately: true,
         ]
         guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
-        return NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
+        let artwork = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
+        return (artwork, ArtworkTint.color(of: image))
     }
 }
