@@ -91,11 +91,12 @@ public final class SystemMetricsReader: @unchecked Sendable {
         var best: Double?
         while case let service = IOIteratorNext(iterator), service != 0 {
             defer { IOObjectRelease(service) }
-            guard let stats = IORegistryEntryCreateCFProperty(
+            let property = IORegistryEntryCreateCFProperty(
                 service, "PerformanceStatistics" as CFString, kCFAllocatorDefault, 0
-            )?.takeRetainedValue() as? [String: Any],
-                let value = (stats["Device Utilization %"] ?? stats["GPU Activity(%)"]) as? NSNumber
-            else { continue }
+            )
+            guard let stats = property?.takeRetainedValue() as? [String: Any] else { continue }
+            let reading = stats["Device Utilization %"] ?? stats["GPU Activity(%)"]
+            guard let value = reading as? NSNumber else { continue }
             best = max(best ?? 0, value.doubleValue / 100)
         }
         return best.map { min(max($0, 0), 1) }

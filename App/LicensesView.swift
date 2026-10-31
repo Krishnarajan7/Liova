@@ -23,13 +23,8 @@ struct LicensesView: View {
     ]
 
     private let notices: [Notice] = entries.compactMap { entry in
-        guard let url = Bundle.main.url(
-            forResource: "LICENSE",
-            withExtension: nil,
-            subdirectory: "Licenses/\(entry.id)"
-        ),
-            let text = try? String(contentsOf: url, encoding: .utf8)
-        else { return nil }
+        let url = Bundle.main.url(forResource: "LICENSE", withExtension: nil, subdirectory: "Licenses/\(entry.id)")
+        guard let url, let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
         var notice = entry
         notice.text = text
         return notice

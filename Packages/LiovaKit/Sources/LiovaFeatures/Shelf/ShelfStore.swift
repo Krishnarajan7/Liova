@@ -62,13 +62,8 @@ public enum ShelfBookmarks {
     /// the old one went stale (the file moved), so callers can update the stored item.
     public static func resolve(_ item: ShelfItem) -> (url: URL, refreshed: Data?)? {
         var stale = false
-        guard let url = try? URL(
-            resolvingBookmarkData: item.bookmark,
-            options: [.withoutUI],
-            bookmarkDataIsStale: &stale
-        ),
-            FileManager.default.fileExists(atPath: url.path)
-        else { return nil }
+        let url = try? URL(resolvingBookmarkData: item.bookmark, options: [.withoutUI], bookmarkDataIsStale: &stale)
+        guard let url, FileManager.default.fileExists(atPath: url.path) else { return nil }
         return (url, stale ? make(for: url) : nil)
     }
 }
