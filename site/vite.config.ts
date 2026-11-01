@@ -4,7 +4,7 @@ import { defineConfig } from "vite";
 
 /**
  * The repository's star count, read once at build time so visitors' browsers never call GitHub
- * (the site loads nothing from anyone else). The Website workflow rebuilds daily to refresh it.
+ * (the site loads nothing from anyone else). It's as fresh as the last build.
  */
 async function githubStars(): Promise<number | null> {
   try {
@@ -21,9 +21,8 @@ async function githubStars(): Promise<number | null> {
   }
 }
 
-// GitHub Pages serves the site under /Liova/; a custom domain would use "/".
 export default defineConfig(async () => ({
-  base: process.env.SITE_BASE ?? "/",
+  base: "/",
   define: { __GITHUB_STARS__: JSON.stringify(await githubStars()) },
   plugins: [react(), tailwindcss()],
   build: { target: "es2022", cssMinify: true },

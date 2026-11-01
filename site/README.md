@@ -1,6 +1,6 @@
 # Liova website
 
-The landing page at [krishnarajan7.github.io/Liova](https://krishnarajan7.github.io/Liova/). React 19, TypeScript, Vite,
+The landing page at [liova.netlify.app](https://liova.netlify.app). React 19, TypeScript, Vite,
 Tailwind CSS 4, [Motion](https://motion.dev) for springs and scroll effects, [Lenis](https://lenis.dev) for smooth
 scrolling, and three bundled fonts (Bricolage Grotesque, Figtree, Caveat). It ships as static files, makes no requests to anyone else, and sets no cookies.
 
@@ -56,10 +56,9 @@ The script screenshots each `?still=` page with headless Chrome at 2x.
 
 ## Publishing
 
-`.github/workflows/site.yml` builds every change to `site/` and publishes `main` to GitHub Pages under `/Liova/`
-(`SITE_BASE`). Pages has to be switched on once: **Settings → Pages → Source: GitHub Actions**. With a custom domain,
-build with `SITE_BASE=/` and update `og:url` and `og:image` in `index.html`.
+The site is hosted on Netlify. To publish, run `pnpm build` and drag `dist/` onto the site's **Deploys** page in
+Netlify. `.github/workflows/site.yml` only checks that every change to `site/` still type-checks and builds.
 
 The GitHub star count beside "Star on GitHub" is read from GitHub's API when the site is built (`vite.config.ts`),
-so visitors' browsers never contact GitHub. The workflow also runs daily to keep it current. If the API can't be
+so visitors' browsers never contact GitHub. It's as fresh as the last build you uploaded. If the API can't be
 reached, the count is simply left out.

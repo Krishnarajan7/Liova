@@ -9,7 +9,7 @@ const points: { icon: ReactNode; title: string; body: string }[] = [
   {
     icon: <Eye size={20} />,
     title: "No telemetry. Ever.",
-    body: "No analytics, no crash reporters, no accounts. Once a day it asks GitHub if there's a new version, and you can turn that off.",
+    body: "No analytics, no crash reporters, no accounts. Once a day it asks GitHub if there's a new version, and you can turn that off. Lyrics and weather go online only if you switch them on.",
   },
   {
     icon: <Lock size={20} />,

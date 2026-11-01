@@ -99,7 +99,7 @@ Liova/
 │   └─ Tests/...                # swift test
 │   (Features/* and Providers/* become additional targets in this package later)
 ├─ .github/workflows/ci.yml  # build + swift test + swiftlint on macos-26 (Apple Silicon)
-├─ site/                  # the website (React + TypeScript + Vite), published to GitHub Pages
+├─ site/                  # the website (React + TypeScript + Vite), hosted on Netlify
 └─ docs/                  # these docs; docs/images holds the README pictures
 ```
 

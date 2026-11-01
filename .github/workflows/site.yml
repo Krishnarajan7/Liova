@@ -1,6 +1,7 @@
 name: Website
 
-# Builds the site in site/ on every change to it, and publishes it to GitHub Pages from main.
+# Checks that the site in site/ builds on every change to it. It's hosted on Netlify, which
+# gets the built bundle (site/dist) by hand.
 on:
   push:
     branches: [main]
@@ -8,9 +9,6 @@ on:
   pull_request:
     paths: ["site/**", ".github/workflows/site.yml"]
   workflow_dispatch:
-  # Daily, so the GitHub star count on the page stays current.
-  schedule:
-    - cron: "17 6 * * *"
 
 permissions:
   contents: read
@@ -40,24 +38,4 @@ jobs:
       - name: Type-check and build
         run: pnpm build
         env:
-          SITE_BASE: /Liova/
           GITHUB_TOKEN: ${{ github.token }}
-      - uses: actions/upload-pages-artifact@v5
-        if: github.event_name != 'pull_request'
-        with:
-          path: site/dist
-
-  deploy:
-    name: Publish to GitHub Pages
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v5

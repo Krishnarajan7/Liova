@@ -113,8 +113,7 @@ struct LyricsFeatureTests {
         try await settle()
         feature.update(song("Yellow"))
         #expect(feature.status == .loading)
-        try await Task.sleep(for: .milliseconds(50)) // no debounce for cache hits
-        #expect(feature.lyrics == synced)
+        #expect(await eventually { feature.lyrics == synced }) // no debounce for cache hits
         #expect(await fetcher.queries.map(\.title) == ["Yellow", "Fix You"])
     }
 

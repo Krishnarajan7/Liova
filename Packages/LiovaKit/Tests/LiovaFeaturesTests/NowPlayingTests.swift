@@ -195,7 +195,7 @@ struct NowPlayingFeatureTests {
         #expect(provider.repeats.isEmpty)
     }
 
-    @Test func spotifyRepeatGoesThroughItsScriptingOnAndOff() async throws {
+    @Test func spotifyRepeatGoesThroughItsScriptingOnAndOff() async {
         let scripting = FakeRepeatScripting()
         let feature = NowPlayingFeature(
             engine: engine, settings: settings, provider: provider, scripting: scripting, now: { now }
@@ -205,11 +205,10 @@ struct NowPlayingFeatureTests {
         #expect(feature.repeatMode == .off)
         feature.cycleRepeat()
         #expect(feature.repeatMode == .all)
-        try await Task.sleep(for: .milliseconds(50))
+        #expect(await eventually { scripting.setCalls == [true] })
         feature.cycleRepeat()
         #expect(feature.repeatMode == .off)
-        try await Task.sleep(for: .milliseconds(50))
-        #expect(scripting.setCalls == [true, false])
+        #expect(await eventually { scripting.setCalls == [true, false] })
         #expect(provider.repeats.isEmpty)
     }
 
@@ -225,7 +224,7 @@ struct NowPlayingFeatureTests {
         #expect(feature.repeatMode == .all)
     }
 
-    @Test func refusedPermissionPutsTheButtonBack() async throws {
+    @Test func refusedPermissionPutsTheButtonBack() async {
         let scripting = FakeRepeatScripting()
         scripting.refuse()
         let feature = NowPlayingFeature(
@@ -234,8 +233,7 @@ struct NowPlayingFeatureTests {
         feature.start()
         provider.emit(track())
         feature.cycleRepeat()
-        try await Task.sleep(for: .milliseconds(50))
-        #expect(feature.repeatMode == .off)
+        #expect(await eventually { scripting.setCalls == [true] && feature.repeatMode == .off })
     }
 
     @Test func seekUsesTrackDuration() {
