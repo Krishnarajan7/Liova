@@ -1,6 +1,6 @@
 # Liova website
 
-The landing page at [liova.netlify.app](https://liova.netlify.app). React 19, TypeScript, Vite,
+The landing page at [liova-notch.netlify.app](https://liova-notch.netlify.app). React 19, TypeScript, Vite,
 Tailwind CSS 4, [Motion](https://motion.dev) for springs and scroll effects, [Lenis](https://lenis.dev) for smooth
 scrolling, and three bundled fonts (Bricolage Grotesque, Figtree, Caveat). It ships as static files, makes no requests to anyone else, and sets no cookies.
 

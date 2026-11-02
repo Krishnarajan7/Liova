@@ -12,7 +12,7 @@ Music and lyrics, charging, AirPods, downloads and your coding agents, right whe
 ![Idle CPU 0%](https://img.shields.io/badge/idle%20CPU-0.0%25-brightgreen)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-[**Website**](https://liova.netlify.app) · [**Get it**](#get-it) · [Docs](docs) · [Changelog](CHANGELOG.md)
+[**Website**](https://liova-notch.netlify.app) · [**Get it**](#get-it) · [Docs](docs) · [Changelog](CHANGELOG.md)
 
 <br>
 

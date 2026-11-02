@@ -32,7 +32,8 @@ if codesign -d --entitlements - "$APP" 2>/dev/null | grep -q "get-task-allow"; t
     echo "The app has get-task-allow; a release must not." >&2
     exit 1
 fi
-REQUIREMENT="$(codesign -d -r- "$APP" 2>&1 | grep '^designated')"
+# Ad-hoc signatures have only an implicit requirement, which codesign prints as a comment.
+REQUIREMENT="$(codesign -d -r- "$APP" 2>&1 | grep -E '^(# )?designated')"
 echo "$REQUIREMENT"
 if [ "$IDENTITY" != "-" ] && ! grep -q "certificate leaf" <<< "$REQUIREMENT"; then
     echo "Signed with \"$IDENTITY\" but the requirement doesn't pin a certificate." >&2

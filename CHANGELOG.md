@@ -10,7 +10,7 @@ released, its section becomes the GitHub release notes.
 
 ## [Unreleased]
 
-## [1.0.0] - Unreleased
+## [1.0.0] - 2026-11-01
 
 The first public release.
 
