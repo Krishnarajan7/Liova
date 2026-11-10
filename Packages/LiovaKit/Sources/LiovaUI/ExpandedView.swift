@@ -119,11 +119,15 @@ private struct HomePage: View {
         VStack(alignment: .leading, spacing: 10) {
             if let current = lasting.first ?? brief {
                 let renderer = renderers.renderer(for: current)
-                if let custom = renderer?.expanded(for: current) {
-                    custom
-                } else {
-                    ActivityCard(activity: current)
+                Group {
+                    if let custom = renderer?.expanded(for: current) {
+                        custom
+                    } else {
+                        ActivityCard(activity: current)
+                    }
                 }
+                .id(current.id)
+                .transition(Self.cardTransition)
                 let room = renderer?.expandedNeedsFullHeight(for: current) == true
                     ? 0 : renderer?.expandedQueueRoom(for: current) ?? 2
                 let queued = lasting.dropFirst().prefix(room)
@@ -135,6 +139,7 @@ private struct HomePage: View {
                                     engine.bringToFront(activity.id)
                                 }
                             }
+                            .transition(Motion.listItem)
                         }
                     }
                 }
@@ -144,7 +149,16 @@ private struct HomePage: View {
                     .frame(maxHeight: .infinity)
             }
         }
+        // Activities arriving and leaving while open (a download starting, finishing) move
+        // into place instead of snapping.
+        .animation(Motion.list, value: lasting.map(\.id))
     }
+
+    /// The main card changing hands: the new one rises in as the old one fades.
+    private static let cardTransition = AnyTransition.asymmetric(
+        insertion: .opacity.combined(with: .offset(y: 6)).animation(Motion.swap.delay(0.05)),
+        removal: .opacity.animation(Motion.contentOut)
+    )
 }
 
 /// Page icons with a highlight that slides to the selected one.

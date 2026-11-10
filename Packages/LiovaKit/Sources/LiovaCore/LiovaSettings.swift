@@ -62,6 +62,11 @@ public final class LiovaSettings {
         didSet { store(musicBars.rawValue, .musicBars) }
     }
 
+    /// Black like the camera housing, or Liquid Glass once open.
+    public var notchStyle: NotchStyle {
+        didSet { store(notchStyle.rawValue, .notchStyle) }
+    }
+
     /// Where volume and brightness changes appear.
     public var hudStyle: HUDStyle {
         didSet { store(hudStyle.rawValue, .hudStyle) }
@@ -75,6 +80,16 @@ public final class LiovaSettings {
     /// Flash the notch when any app turns on the camera or microphone.
     public var captureIndicatorEnabled: Bool {
         didSet { store(captureIndicatorEnabled, .captureIndicatorEnabled) }
+    }
+
+    /// While a call app uses the microphone: mute and hang up from the notch.
+    public var callControlsEnabled: Bool {
+        didSet { store(callControlsEnabled, .callControlsEnabled) }
+    }
+
+    /// Say so in the notch when one app is heating up the Mac or filling its memory.
+    public var resourceAlertsEnabled: Bool {
+        didSet { store(resourceAlertsEnabled, .resourceAlertsEnabled) }
     }
 
     /// Show the next calendar event. Off by default: it needs calendar access.
@@ -198,8 +213,11 @@ public final class LiovaSettings {
         hideInFullScreen = defaults.object(forKey: Key.hideInFullScreen.rawValue) as? Bool ?? true
         captureIndicatorEnabled = defaults.object(forKey: Key.captureIndicatorEnabled.rawValue) as? Bool ?? true
         calendarEnabled = defaults.object(forKey: Key.calendarEnabled.rawValue) as? Bool ?? false
+        resourceAlertsEnabled = defaults.object(forKey: Key.resourceAlertsEnabled.rawValue) as? Bool ?? true
+        callControlsEnabled = defaults.object(forKey: Key.callControlsEnabled.rawValue) as? Bool ?? true
         hasSeenWelcome = defaults.object(forKey: Key.hasSeenWelcome.rawValue) as? Bool ?? false
         hudStyle = defaults.string(forKey: Key.hudStyle.rawValue).flatMap(HUDStyle.init(rawValue:)) ?? .sideBar
+        notchStyle = defaults.string(forKey: Key.notchStyle.rawValue).flatMap(NotchStyle.init(rawValue:)) ?? .black
         nowPlayingEnabled = defaults.object(forKey: Key.nowPlayingEnabled.rawValue) as? Bool ?? true
         agentIslandEnabled = defaults.object(forKey: Key.agentIslandEnabled.rawValue) as? Bool ?? true
         headphonesEnabled = defaults.object(forKey: Key.headphonesEnabled.rawValue) as? Bool ?? true
@@ -236,9 +254,12 @@ public final class LiovaSettings {
         case hudReplacementEnabled
         case nowPlayingEnabled
         case hudStyle
+        case notchStyle
         case hasSeenWelcome
         case calendarEnabled
         case captureIndicatorEnabled
+        case resourceAlertsEnabled
+        case callControlsEnabled
         case hideInFullScreen
         case musicBars
         /// Before `musicBars`: a plain on/off switch.
@@ -285,6 +306,15 @@ public final class LiovaSettings {
     private static func clampHoverDelay(_ value: Double) -> Double {
         value.isFinite ? min(max(value, hoverDelayRange.lowerBound), hoverDelayRange.upperBound) : 0.12
     }
+}
+
+/// What the notch is made of.
+public enum NotchStyle: String, CaseIterable, Codable, Sendable {
+    /// Solid black, one with the camera housing.
+    case black
+    /// Liquid Glass (a blur before macOS 26) once open; the closed notch stays black so it
+    /// still blends with the camera housing.
+    case glass
 }
 
 /// Where the volume and brightness HUD appears.

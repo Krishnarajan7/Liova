@@ -25,8 +25,11 @@ struct NotchRootView: View {
         let hidden = model.presentation == .closed && (idleVirtual || model.isCoveredByFullScreen)
 
         ZStack(alignment: .top) {
-            NotchShape(topRadius: spec.topRadius, bottomRadius: spec.bottomRadius)
-                .fill(.black)
+            NotchSurface(
+                style: model.style,
+                isExpanded: isExpanded,
+                shape: NotchShape(topRadius: spec.topRadius, bottomRadius: spec.bottomRadius)
+            )
 
             content(
                 isExpanded: isExpanded,
@@ -80,7 +83,12 @@ struct NotchRootView: View {
                 .scaleEffect(isExpanded ? 0.85 : 1)
                 .animation(isExpanded ? Motion.contentOut : Motion.compactContentIn, value: isExpanded)
                 .environment(\.notchCompactVisible, compactVisible)
-                .transition(.opacity.combined(with: .scale(scale: 0.8)).animation(Motion.compactContentIn))
+                // Arrives once the ears have grown; leaves before they shrink, so nothing is
+                // squeezed by the closing shape.
+                .transition(.asymmetric(
+                    insertion: .opacity.combined(with: .scale(scale: 0.8)).animation(Motion.compactContentIn),
+                    removal: .opacity.combined(with: .scale(scale: 0.8)).animation(Motion.contentOut)
+                ))
             }
             if model.keepsExpandedContent || isExpanded {
                 ExpandedView(model: model, engine: engine, renderers: renderers, chrome: chrome)
@@ -161,6 +169,9 @@ struct CompactView: View {
         // so the shape reads as one card instead of icons adrift in black.
         .padding(.horizontal, showsDetail ? detailInset / 2 : 0)
         .frame(maxWidth: .infinity)
+        // Another activity taking over (a download starting over music, then "Downloaded"):
+        // the ears cross-fade and symbols morph, instead of snapping.
+        .animation(Motion.swap, value: activity.id)
     }
 }
 

@@ -10,6 +10,24 @@ released, its section becomes the GitHub release notes.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-10
+
+### Added
+
+- **Glass notch**: choose Black or Glass in Settings → Notch. Glass shows the desktop through
+  the open notch (Liquid Glass on macOS 26); closed, it stays black to match the camera.
+- **What's using your Mac**: the System page lists the apps using the most CPU or memory, says
+  when one is heating up the Mac or filling memory, and quits it (Force Quit if it hangs on).
+- **Heavy-app alert**: when one app keeps the processor busy for minutes, or fills memory while
+  it's running short, the closed notch shows its icon and the open notch offers to quit it.
+  On by default; turn it off in Settings.
+- The rain heads-up now shows rain (or snow) falling from the cloud.
+
+### Changed
+
+- Downloads and other activities fade and morph into place when they start, finish or take
+  over from music, instead of snapping.
+
 ## [1.0.0] - 2026-11-06
 
 The first public release.

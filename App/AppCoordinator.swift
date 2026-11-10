@@ -26,6 +26,8 @@ final class AppCoordinator {
     @ObservationIgnored private lazy var welcome = WelcomeFeature(engine: engine, settings: settings)
     @ObservationIgnored private lazy var calendar = CalendarFeature(engine: engine, settings: settings)
     @ObservationIgnored private lazy var capture = CaptureIndicatorFeature(engine: engine, settings: settings)
+    @ObservationIgnored private lazy var resourceAlerts = ResourceAlertFeature(engine: engine, settings: settings)
+    @ObservationIgnored private lazy var calls = CallFeature(engine: engine, settings: settings)
     @ObservationIgnored private lazy var headphones = HeadphonesFeature(engine: engine, settings: settings)
     @ObservationIgnored private lazy var lyrics = LyricsFeature(settings: settings)
     @ObservationIgnored private(set) lazy var weather = WeatherFeature(engine: engine, settings: settings)
@@ -92,11 +94,19 @@ final class AppCoordinator {
         hud.syncWithSettings()
         downloads.syncWithSettings()
         capture.syncWithSettings()
+        resourceAlerts.syncWithSettings()
+        calls.syncWithSettings()
         headphones.syncWithSettings()
         calendar.syncWithSettings()
         weather.syncWithSettings()
         updates.syncWithSettings()
         startPluginServer()
+        observeSettings()
+        Log.app.info("Liova started")
+    }
+
+    /// Every feature rechecks its settings when any of these change.
+    private func observeSettings() {
         settingsObservation = ObservationLoop { [weak self] in
             guard let self else { return }
             // Reading these registers interest; any change reruns the reaction below.
@@ -104,6 +114,7 @@ final class AppCoordinator {
                 settings.displayPlacement,
                 settings.showVirtualNotchWhenIdle,
                 settings.hideInFullScreen,
+                settings.notchStyle,
                 settings.batteryActivitiesEnabled,
                 settings.lowBatteryThreshold,
                 settings.nowPlayingEnabled,
@@ -115,6 +126,8 @@ final class AppCoordinator {
                 settings.downloadsEnabled,
                 settings.telegramDownloadsEnabled,
                 settings.captureIndicatorEnabled,
+                settings.resourceAlertsEnabled,
+                settings.callControlsEnabled,
                 settings.headphonesEnabled,
                 settings.calendarEnabled,
                 settings.weatherEnabled,
@@ -131,12 +144,13 @@ final class AppCoordinator {
             self?.agents.syncWithSettings()
             self?.downloads.syncWithSettings()
             self?.capture.syncWithSettings()
+            self?.resourceAlerts.syncWithSettings()
+            self?.calls.syncWithSettings()
             self?.headphones.syncWithSettings()
             self?.calendar.syncWithSettings()
             self?.weather.syncWithSettings()
             self?.updates.syncWithSettings()
         }
-        Log.app.info("Liova started")
     }
 
     func stop() {
@@ -154,6 +168,8 @@ final class AppCoordinator {
         agents.stop()
         timers.stop()
         capture.stop()
+        resourceAlerts.stop()
+        calls.stop()
         headphones.stop()
         calendar.stop()
         weather.stop()
@@ -172,30 +188,6 @@ final class AppCoordinator {
             }
         } catch {
             Log.app.notice("Invalid link: \(error.message, privacy: .public)")
-        }
-    }
-
-    /// Custom views for each feature's activities.
-    private func registerRenderers() {
-        renderers.register(NowPlayingRenderer(feature: nowPlaying, lyrics: lyrics), forSource: NowPlayingPolicy.source)
-        nowPlaying.onInfoChange = { [weak self] info in self?.lyrics.update(info) }
-        renderers.register(HUDRenderer(), forSource: HUDPolicy.source)
-        renderers.register(BatteryRenderer(), forSource: BatteryActivityPolicy.source)
-        renderers.register(TimerRenderer(feature: timers), forSource: TimerPolicy.source)
-        renderers.register(CalendarRenderer(feature: calendar), forSource: CalendarPolicy.source)
-        renderers.register(WeatherRenderer(feature: weather), forSource: WeatherPolicy.source)
-        renderers.register(
-            UpdateRenderer(feature: updates) { [weak self] in self?.showSettings(tab: .updates) },
-            forSource: UpdatePolicy.source
-        )
-        renderers.register(DownloadsRenderer(feature: downloads), forSource: DownloadsPolicy.source)
-        hud.sideHUD = { [volumeBar, brightnessBar] state in
-            (state.kind == .brightness ? brightnessBar : volumeBar).show(state)
-        }
-        renderers.register(AgentIslandRenderer(feature: agents), forSource: AgentIslandPolicy.source)
-        renderers.register(HeadphonesRenderer(feature: headphones), forSource: HeadphonesPolicy.source)
-        agents.onAttentionChange = { [weak self] needed in
-            self?.notchSystem.setAttention(needed)
         }
     }
 
@@ -314,31 +306,6 @@ extension AppCoordinator {
     }
 }
 
-/// Re-runs `onChange` every time a value read in `track` changes, until the loop is released.
-@MainActor
-final class ObservationLoop {
-    private let track: @MainActor () -> Void
-    private let onChange: @MainActor () -> Void
-
-    init(track: @escaping @MainActor () -> Void, onChange: @escaping @MainActor () -> Void) {
-        self.track = track
-        self.onChange = onChange
-        observe()
-    }
-
-    private func observe() {
-        withObservationTracking(track) { [weak self] in
-            // Called before the change is applied; react on the next main-actor turn.
-            Task { @MainActor in
-                // Once the loop is released, `self` is nil and observation stops.
-                guard let self else { return }
-                self.onChange()
-                self.observe()
-            }
-        }
-    }
-}
-
 private extension AppCoordinator {
     /// Starts plugin tier 1: the local socket that the `liova` CLI, scripts and agents talk to.
     func startPluginServer() {
@@ -364,7 +331,9 @@ private extension AppCoordinator {
             Log.app.error("Plugin socket failed to start: \(String(describing: error), privacy: .public)")
         }
     }
+}
 
+extension AppCoordinator {
     /// Beside the camera in the open notch. Never squeezed: when everything doesn't fit,
     /// details drop one at a time (headphones level, charging bolt, battery percentage),
     /// each still in its tooltip, instead of wrapping.
@@ -393,5 +362,33 @@ private extension AppCoordinator {
                 BatteryStatusView(feature: battery, detail: .icon)
             }
         })
+    }
+}
+
+extension AppCoordinator {
+    /// Custom views for each feature's activities.
+    private func registerRenderers() {
+        renderers.register(NowPlayingRenderer(feature: nowPlaying, lyrics: lyrics), forSource: NowPlayingPolicy.source)
+        nowPlaying.onInfoChange = { [weak self] info in self?.lyrics.update(info) }
+        renderers.register(HUDRenderer(), forSource: HUDPolicy.source)
+        renderers.register(BatteryRenderer(), forSource: BatteryActivityPolicy.source)
+        renderers.register(TimerRenderer(feature: timers), forSource: TimerPolicy.source)
+        renderers.register(CalendarRenderer(feature: calendar), forSource: CalendarPolicy.source)
+        renderers.register(WeatherRenderer(feature: weather), forSource: WeatherPolicy.source)
+        renderers.register(
+            UpdateRenderer(feature: updates) { [weak self] in self?.showSettings(tab: .updates) },
+            forSource: UpdatePolicy.source
+        )
+        renderers.register(DownloadsRenderer(feature: downloads), forSource: DownloadsPolicy.source)
+        hud.sideHUD = { [volumeBar, brightnessBar] state in
+            (state.kind == .brightness ? brightnessBar : volumeBar).show(state)
+        }
+        renderers.register(AgentIslandRenderer(feature: agents), forSource: AgentIslandPolicy.source)
+        renderers.register(HeadphonesRenderer(feature: headphones), forSource: HeadphonesPolicy.source)
+        renderers.register(ResourceAlertRenderer(feature: resourceAlerts), forSource: ResourceAlertPolicy.source)
+        renderers.register(CallRenderer(feature: calls), forSource: CallPolicy.source)
+        agents.onAttentionChange = { [weak self] needed in
+            self?.notchSystem.setAttention(needed)
+        }
     }
 }

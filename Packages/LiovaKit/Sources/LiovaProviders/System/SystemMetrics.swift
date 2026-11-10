@@ -63,7 +63,7 @@ public final class SystemMetricsReader: @unchecked Sendable {
     // MARK: - Memory
 
     /// "Memory used" as Activity Monitor counts it: app memory + wired + compressed.
-    static func memoryUsage() -> Double {
+    public static func memoryUsage() -> Double {
         var stats = vm_statistics64()
         var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.stride / MemoryLayout<integer_t>.stride)
         let result = withUnsafeMutablePointer(to: &stats) { pointer in

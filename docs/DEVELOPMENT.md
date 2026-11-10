@@ -182,3 +182,16 @@ pkill -x Liova
 | Accessibility prompt after every build | Use the self-signed certificate above |
 | Build fails with Swift concurrency errors | That's strict concurrency doing its job. Fix the isolation rather than suppressing it; ask in your PR if unsure. |
 | `swift test` fails but the app builds | Run `make test` from the repo root; it runs inside `Packages/LiovaKit` |
+
+## Preview features
+
+New features can be merged before they're released. Each one gets a case in
+`PreviewFeature` (`Packages/LiovaKit/Sources/LiovaCore/PreviewFeature.swift`) and checks
+`isEnabled()` before it starts or shows its settings:
+
+- Debug builds (`make run`) show every preview feature.
+- Release builds hide them. To try one in a release build:
+  `defaults write app.liova.Liova previewFeatures -array calls`, then restart Liova.
+- To release one, delete its case and the checks that use it, and add it to `CHANGELOG.md`.
+
+Preview features stay out of the changelog until they're released.

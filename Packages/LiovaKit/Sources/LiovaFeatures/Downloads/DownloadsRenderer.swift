@@ -21,6 +21,8 @@ public final class DownloadsRenderer: ActivityRenderer {
             Image(systemName: activity.symbol ?? DownloadsPolicy.activeSymbol)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Self.color(for: activity))
+                // The arrow turns into the checkmark when it finishes.
+                .contentTransition(.symbolEffect(.replace))
                 .frame(width: 21, height: 21)
         )
     }

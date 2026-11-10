@@ -19,6 +19,10 @@ public enum Motion {
     /// appearing): settled, like open, so the edge never bounces past the content.
     public static let resize = Animation.spring(response: 0.38, dampingFraction: 1.0)
 
+    /// One activity handing the notch to another while it stays the same size: a quick
+    /// cross-fade, no bounce.
+    public static let swap = Animation.smooth(duration: 0.3)
+
     /// Items joining or leaving a list (timers, shelf files): lively but settled.
     public static let list = Animation.spring(response: 0.38, dampingFraction: 0.8)
 

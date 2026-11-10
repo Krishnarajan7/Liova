@@ -54,7 +54,11 @@ public final class NotchController {
         self.engine = engine
         self.settings = settings
         self.renderers = renderers
-        model = NotchModel(geometry: display.geometry, showsIdleVirtualNotch: settings.showVirtualNotchWhenIdle)
+        model = NotchModel(
+            geometry: display.geometry,
+            showsIdleVirtualNotch: settings.showVirtualNotchWhenIdle,
+            style: settings.notchStyle
+        )
         panel = NotchPanel(frame: Self.panelFrame(for: display.geometry))
 
         let root = NotchRootView(model: model, engine: engine, renderers: renderers, chrome: chrome) { [weak self] in
@@ -87,6 +91,9 @@ public final class NotchController {
     public func settingsDidChange() {
         if model.showsIdleVirtualNotch != settings.showVirtualNotchWhenIdle {
             model.showsIdleVirtualNotch = settings.showVirtualNotchWhenIdle
+        }
+        if model.style != settings.notchStyle {
+            model.style = settings.notchStyle
         }
     }
 

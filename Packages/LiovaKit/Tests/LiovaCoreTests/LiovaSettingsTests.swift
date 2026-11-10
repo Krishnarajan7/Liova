@@ -22,6 +22,15 @@ struct LiovaSettingsTests {
         #expect(!settings.lyricsEnabled)
         #expect(settings.lyricsInClosedNotch)
         #expect(settings.agentsOverMusic)
+        #expect(settings.notchStyle == .black)
+        #expect(settings.resourceAlertsEnabled)
+    }
+
+    @Test func notchStyleIsRemembered() {
+        LiovaSettings(defaults: defaults).notchStyle = .glass
+        #expect(LiovaSettings(defaults: defaults).notchStyle == .glass)
+        defaults.set("chrome", forKey: "notchStyle") // unknown: back to black
+        #expect(LiovaSettings(defaults: defaults).notchStyle == .black)
     }
 
     @Test func oldMusicBarsSwitchCarriesOver() {

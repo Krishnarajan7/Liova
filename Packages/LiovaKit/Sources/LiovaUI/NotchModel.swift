@@ -10,6 +10,7 @@ public final class NotchModel {
     public internal(set) var presentation: NotchPresentation = .closed
     public internal(set) var geometry: NotchGeometry
     public internal(set) var showsIdleVirtualNotch: Bool
+    public internal(set) var style: NotchStyle
     /// The open notch's selected page. Kept across openings, reset to Home when something
     /// needs the user (e.g. an agent asking for permission).
     public internal(set) var selectedPage = NotchChrome.homePageID
@@ -31,7 +32,8 @@ public final class NotchModel {
         isFileDragActive ? nil : expandedContentHeight
     }
 
-    init(geometry: NotchGeometry, showsIdleVirtualNotch: Bool) {
+    init(geometry: NotchGeometry, showsIdleVirtualNotch: Bool, style: NotchStyle = .black) {
+        self.style = style
         self.geometry = geometry
         self.showsIdleVirtualNotch = showsIdleVirtualNotch
     }

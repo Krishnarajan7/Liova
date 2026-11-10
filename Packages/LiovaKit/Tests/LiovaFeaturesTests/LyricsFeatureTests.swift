@@ -65,8 +65,10 @@ struct LyricsFeatureTests {
     }
 
     /// Lets the lookup task (debounce included) finish.
+    /// Past the lookup delay, with room for a busy machine (the whole suite runs in
+    /// parallel, and CI runners are slow).
     private func settle() async throws {
-        try await Task.sleep(for: LyricsFeature.lookupDelay + .milliseconds(300))
+        try await Task.sleep(for: LyricsFeature.lookupDelay + .milliseconds(800))
     }
 
     @Test func offByDefaultAndNeverAsks() async throws {
