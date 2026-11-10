@@ -35,11 +35,25 @@ enum SettingsTab: Hashable, CaseIterable {
 struct SettingsPane: View {
     let tab: SettingsTab
     let coordinator: AppCoordinator
+    /// How tall the tab would be with everything showing.
+    @State private var naturalHeight: CGFloat?
 
+    /// Short tabs fit their content; long ones stop at the screen's height and scroll.
     var body: some View {
         content
-            .frame(width: 460)
-            .fixedSize(horizontal: false, vertical: true)
+            .frame(width: 460, height: naturalHeight.map { min($0, Self.maxHeight) })
+            .background {
+                content
+                    .frame(width: 460)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .hidden()
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { naturalHeight = $0 }
+            }
+    }
+
+    /// The screen's height, less the title bar and tabs, and a margin.
+    private static var maxHeight: CGFloat {
+        (NSScreen.main?.visibleFrame.height ?? 800) - 160
     }
 
     @ViewBuilder private var content: some View {
@@ -175,6 +189,17 @@ private struct ActivitySettings: View {
                         "While an app records from the microphone, the notch shows the call, how long it's run "
                             + "and whether you're muted. Mute works in every app; Hang Up presses the app's own "
                             + "Leave button, which needs Accessibility access."
+                    )
+                }
+            }
+            if PreviewFeature.clipboard.isEnabled() {
+                Section {
+                    Toggle("Clipboard history", isOn: $settings.clipboardHistoryEnabled)
+                } footer: {
+                    Text(
+                        "Keeps the last 30 things you copy, to copy again from the notch's Clipboard page. "
+                            + "Only in memory: forgotten when Liova quits, except what you pin. "
+                            + "Passwords and anything copied in a password manager are never kept."
                     )
                 }
             }

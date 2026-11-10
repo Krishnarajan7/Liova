@@ -30,7 +30,7 @@ export function Numbers() {
       <SectionHeader
         label="Quiet by design"
         title="On screen all day. Felt by no one."
-        body="A notch app never quits, so it has to cost nothing. Nothing in Liova polls: music, battery, displays and agents tell it when something changes, and in between it sleeps."
+        body="A notch app never quits, so it has to cost nothing. Music, battery, displays and agents tell Liova when something changes, and in between it sleeps. The one thing on a timer, the check for apps heating your Mac, runs once a minute."
       />
       <div className="relative mx-auto mt-16 grid max-w-5xl grid-cols-2 gap-x-6 gap-y-12 lg:grid-cols-4">
         <Note arrow="down" arrowFirst={false} text="yes, really. we measured." className="-top-14 left-[-4%] hidden lg:flex" delay={1.8} rotate={-6} />

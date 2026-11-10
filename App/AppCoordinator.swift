@@ -19,16 +19,17 @@ final class AppCoordinator {
     @ObservationIgnored private lazy var settingsWindow = SettingsWindow(coordinator: self)
     @ObservationIgnored private let displayManager = DisplayManager()
     @ObservationIgnored private let renderers = ActivityRendererRegistry()
-    @ObservationIgnored private let chrome = NotchChrome()
-    @ObservationIgnored private let systemMonitor = SystemMonitorFeature()
-    @ObservationIgnored private let shelf = ShelfFeature()
-    @ObservationIgnored private lazy var timers = TimerFeature(engine: engine)
+    @ObservationIgnored let chrome = NotchChrome()
+    @ObservationIgnored let systemMonitor = SystemMonitorFeature()
+    @ObservationIgnored let shelf = ShelfFeature()
+    @ObservationIgnored lazy var timers = TimerFeature(engine: engine)
     @ObservationIgnored private lazy var welcome = WelcomeFeature(engine: engine, settings: settings)
-    @ObservationIgnored private lazy var calendar = CalendarFeature(engine: engine, settings: settings)
-    @ObservationIgnored private lazy var capture = CaptureIndicatorFeature(engine: engine, settings: settings)
+    @ObservationIgnored lazy var calendar = CalendarFeature(engine: engine, settings: settings)
+    @ObservationIgnored lazy var capture = CaptureIndicatorFeature(engine: engine, settings: settings)
     @ObservationIgnored private lazy var resourceAlerts = ResourceAlertFeature(engine: engine, settings: settings)
     @ObservationIgnored private lazy var calls = CallFeature(engine: engine, settings: settings)
-    @ObservationIgnored private lazy var headphones = HeadphonesFeature(engine: engine, settings: settings)
+    @ObservationIgnored lazy var clipboard = ClipboardFeature(settings: settings)
+    @ObservationIgnored lazy var headphones = HeadphonesFeature(engine: engine, settings: settings)
     @ObservationIgnored private lazy var lyrics = LyricsFeature(settings: settings)
     @ObservationIgnored private(set) lazy var weather = WeatherFeature(engine: engine, settings: settings)
     @ObservationIgnored private(set) lazy var updates = UpdateFeature(engine: engine, settings: settings)
@@ -50,7 +51,7 @@ final class AppCoordinator {
         provider: MediaRemoteAdapterProvider.Location.bundled().map { MediaRemoteAdapterProvider(location: $0) },
         scripting: AppleScriptRepeat()
     )
-    @ObservationIgnored private lazy var battery = BatteryFeature(
+    @ObservationIgnored lazy var battery = BatteryFeature(
         engine: engine,
         settings: settings,
         provider: IOKitPowerSource()
@@ -96,6 +97,7 @@ final class AppCoordinator {
         capture.syncWithSettings()
         resourceAlerts.syncWithSettings()
         calls.syncWithSettings()
+        clipboard.syncWithSettings()
         headphones.syncWithSettings()
         calendar.syncWithSettings()
         weather.syncWithSettings()
@@ -128,6 +130,7 @@ final class AppCoordinator {
                 settings.captureIndicatorEnabled,
                 settings.resourceAlertsEnabled,
                 settings.callControlsEnabled,
+                settings.clipboardHistoryEnabled,
                 settings.headphonesEnabled,
                 settings.calendarEnabled,
                 settings.weatherEnabled,
@@ -146,6 +149,7 @@ final class AppCoordinator {
             self?.capture.syncWithSettings()
             self?.resourceAlerts.syncWithSettings()
             self?.calls.syncWithSettings()
+            self?.clipboard.syncWithSettings()
             self?.headphones.syncWithSettings()
             self?.calendar.syncWithSettings()
             self?.weather.syncWithSettings()
@@ -170,6 +174,7 @@ final class AppCoordinator {
         capture.stop()
         resourceAlerts.stop()
         calls.stop()
+        clipboard.stop()
         headphones.stop()
         calendar.stop()
         weather.stop()
@@ -205,48 +210,6 @@ final class AppCoordinator {
             try? await Task.sleep(for: .seconds(12))
             self?.notchSystem.setAttention(false)
         }
-    }
-
-    /// Pages and status for the open notch.
-    private func configureChrome() {
-        let shelf = shelf
-        let timers = timers
-        let systemMonitor = systemMonitor
-        chrome.addPage(NotchChrome.Page(id: ShelfFeature.pageID, symbol: "tray.full.fill", title: "Shelf") {
-            AnyView(ShelfPage(feature: shelf))
-        })
-        chrome.addPage(NotchChrome.Page(id: TimerFeature.pageID, symbol: "timer", title: "Timers") {
-            AnyView(TimersPage(feature: timers))
-        })
-        let calendar = calendar
-        let settings = settings
-        chrome.addPage(NotchChrome.Page(
-            id: CalendarFeature.pageID, symbol: "calendar", title: "Calendar",
-            isAvailable: { settings.calendarEnabled },
-            content: { AnyView(CalendarPage(feature: calendar)) }
-        ))
-        let weather = weather
-        chrome.addPage(NotchChrome.Page(
-            id: WeatherPolicy.pageID, symbol: "cloud.sun.fill", title: "Weather",
-            isAvailable: { settings.weatherEnabled },
-            content: { AnyView(WeatherPage(feature: weather)) }
-        ))
-        chrome.addPage(NotchChrome.Page(id: "system", symbol: "gauge.with.dots.needle.67percent", title: "System") {
-            AnyView(SystemPage(feature: systemMonitor))
-        })
-        chrome.dropPageID = ShelfFeature.pageID
-        let battery = battery
-        let capture = capture
-        let headphones = headphones
-        chrome.addPage(NotchChrome.Page(
-            id: HeadphonesPolicy.pageID, symbol: "headphones", title: "Headphones", showsInBar: false,
-            isAvailable: { headphones.isConnected },
-            content: { AnyView(HeadphonesPage(feature: headphones)) }
-        ))
-        chrome.trailingStatus = {
-            Self.trailingStatus(battery: battery, capture: capture, headphones: headphones)
-        }
-        chrome.openSettings = { [weak self] in self?.showSettings() }
     }
 
     /// macOS posts this when any app's Accessibility trust changes, so Liova notices the

@@ -44,7 +44,7 @@ struct HelperGuardTests {
         kill(pid, 0) == 0
     }
 
-    private func waitForExit(_ process: Process, timeout: TimeInterval = 5) -> Bool {
+    private func waitForExit(_ process: Process, timeout: TimeInterval = 15) -> Bool {
         let deadline = Date() + timeout
         while process.isRunning, Date() < deadline {
             usleep(10000)

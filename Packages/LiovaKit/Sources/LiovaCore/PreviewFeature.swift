@@ -9,6 +9,8 @@ import Foundation
 public enum PreviewFeature: String, CaseIterable, Sendable {
     /// Mute and hang up calls from the notch.
     case calls
+    /// What you copied lately, to copy again from the notch.
+    case clipboard
 
     static let defaultsKey = "previewFeatures"
 

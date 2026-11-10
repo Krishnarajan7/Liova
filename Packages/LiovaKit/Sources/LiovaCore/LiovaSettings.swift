@@ -87,6 +87,11 @@ public final class LiovaSettings {
         didSet { store(callControlsEnabled, .callControlsEnabled) }
     }
 
+    /// Keep what you copy, to copy it again from the notch.
+    public var clipboardHistoryEnabled: Bool {
+        didSet { store(clipboardHistoryEnabled, .clipboardHistoryEnabled) }
+    }
+
     /// Say so in the notch when one app is heating up the Mac or filling its memory.
     public var resourceAlertsEnabled: Bool {
         didSet { store(resourceAlertsEnabled, .resourceAlertsEnabled) }
@@ -215,6 +220,7 @@ public final class LiovaSettings {
         calendarEnabled = defaults.object(forKey: Key.calendarEnabled.rawValue) as? Bool ?? false
         resourceAlertsEnabled = defaults.object(forKey: Key.resourceAlertsEnabled.rawValue) as? Bool ?? true
         callControlsEnabled = defaults.object(forKey: Key.callControlsEnabled.rawValue) as? Bool ?? true
+        clipboardHistoryEnabled = defaults.object(forKey: Key.clipboardHistoryEnabled.rawValue) as? Bool ?? true
         hasSeenWelcome = defaults.object(forKey: Key.hasSeenWelcome.rawValue) as? Bool ?? false
         hudStyle = defaults.string(forKey: Key.hudStyle.rawValue).flatMap(HUDStyle.init(rawValue:)) ?? .sideBar
         notchStyle = defaults.string(forKey: Key.notchStyle.rawValue).flatMap(NotchStyle.init(rawValue:)) ?? .black
@@ -260,6 +266,7 @@ public final class LiovaSettings {
         case captureIndicatorEnabled
         case resourceAlertsEnabled
         case callControlsEnabled
+        case clipboardHistoryEnabled
         case hideInFullScreen
         case musicBars
         /// Before `musicBars`: a plain on/off switch.

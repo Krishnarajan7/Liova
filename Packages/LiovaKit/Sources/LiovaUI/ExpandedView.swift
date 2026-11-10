@@ -8,6 +8,8 @@ struct ExpandedView: View {
     let engine: ActivityEngine
     let renderers: ActivityRendererRegistry
     let chrome: NotchChrome
+    /// One selection highlight for both halves of the page bar, so it slides across.
+    @Namespace private var pageHighlight
 
     private static let maxQueued = 2
     private static let horizontalPadding: CGFloat = 18
@@ -40,13 +42,17 @@ struct ExpandedView: View {
     }
 
     /// The row beside the camera: pages on the left, status on the right. The middle stays
-    /// empty so nothing is ever drawn under the camera.
+    /// empty so nothing is ever drawn under the camera; pages that don't fit left of it go
+    /// on the right, before the status.
     private func header(brief: Activity?) -> some View {
         let notch = model.geometry.notchSize
+        let ids = chrome.barPageIDs
+        let leftIDs = Array(ids.prefix(PageBar.leftLimit))
+        let rightIDs = Array(ids.dropFirst(PageBar.leftLimit))
         return HStack(spacing: 0) {
             HStack {
-                if chrome.barPageIDs.count > 1 {
-                    PageBar(model: model, chrome: chrome)
+                if ids.count > 1 {
+                    PageBar(model: model, chrome: chrome, ids: leftIDs, highlight: pageHighlight)
                 }
                 Spacer(minLength: 0)
             }
@@ -54,6 +60,9 @@ struct ExpandedView: View {
             Color.clear.frame(width: notch.width + 8)
             HStack(spacing: 6) {
                 Spacer(minLength: 0)
+                if !rightIDs.isEmpty {
+                    PageBar(model: model, chrome: chrome, ids: rightIDs, highlight: pageHighlight)
+                }
                 if let brief {
                     BriefChip(activity: brief)
                         .transition(.opacity.combined(with: .scale(scale: 0.85, anchor: .trailing)))
@@ -165,13 +174,14 @@ private struct HomePage: View {
 private struct PageBar: View {
     let model: NotchModel
     let chrome: NotchChrome
-    @Namespace private var highlight
+    let ids: [String]
+    let highlight: Namespace.ID
+
+    /// Left of the camera is about 125 pt on a 14" MacBook: five icons, tightened.
+    static let leftLimit = 5
 
     var body: some View {
-        let ids = chrome.barPageIDs
-        // Every icon must fit left of the camera (about 125 pt on a 14" MacBook): tighten as
-        // pages are turned on.
-        let width: CGFloat = ids.count > 5 ? 19 : ids.count > 4 ? 22 : 26
+        let width: CGFloat = ids.count > 4 ? 22 : 26
         HStack(spacing: ids.count > 4 ? 1 : 2) {
             ForEach(ids, id: \.self) { id in
                 let isSelected = model.selectedPage == id

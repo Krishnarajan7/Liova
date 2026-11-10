@@ -114,8 +114,8 @@ public final class AppUsageReader: @unchecked Sendable {
             return cached.path
         }
         var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN) * 4)
-        guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return nil }
-        let path = String(cString: buffer)
+        let length = proc_pidpath(pid, &buffer, UInt32(buffer.count))
+        guard length > 0, let path = Self.string(buffer, length: length) else { return nil }
         paths[pid] = (start, path)
         return path
     }
@@ -139,8 +139,14 @@ public final class AppUsageReader: @unchecked Sendable {
 
     private static func processName(_ pid: pid_t) -> String? {
         var buffer = [CChar](repeating: 0, count: 256)
-        guard proc_name(pid, &buffer, UInt32(buffer.count)) > 0 else { return nil }
-        return String(cString: buffer)
+        let length = proc_name(pid, &buffer, UInt32(buffer.count))
+        guard length > 0 else { return nil }
+        return string(buffer, length: length)
+    }
+
+    /// The first `length` bytes of a C string buffer.
+    private static func string(_ buffer: [CChar], length: Int32) -> String? {
+        String(bytes: buffer.prefix(Int(length)).map { UInt8(bitPattern: $0) }, encoding: .utf8)
     }
 
     private static func allPIDs() -> [pid_t] {
