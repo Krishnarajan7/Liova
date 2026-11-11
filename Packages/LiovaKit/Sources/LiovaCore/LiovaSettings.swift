@@ -106,6 +106,11 @@ public final class LiovaSettings {
         didSet { store(recordingControlsEnabled, .recordingControlsEnabled) }
     }
 
+    /// A short moment in the notch when the Mac is unlocked.
+    public var unlockAnimationEnabled: Bool {
+        didSet { store(unlockAnimationEnabled, .unlockAnimationEnabled) }
+    }
+
     /// Keep what you copy, to copy it again from the notch.
     public var clipboardHistoryEnabled: Bool {
         didSet { store(clipboardHistoryEnabled, .clipboardHistoryEnabled) }
@@ -244,6 +249,7 @@ public final class LiovaSettings {
         customShortcuts = defaults.data(forKey: Key.customShortcuts.rawValue)
             .flatMap { try? JSONDecoder().decode([String: Shortcut].self, from: $0) } ?? [:]
         recordingControlsEnabled = defaults.object(forKey: Key.recordingControlsEnabled.rawValue) as? Bool ?? true
+        unlockAnimationEnabled = defaults.object(forKey: Key.unlockAnimationEnabled.rawValue) as? Bool ?? true
         hasSeenWelcome = defaults.object(forKey: Key.hasSeenWelcome.rawValue) as? Bool ?? false
         hudStyle = defaults.string(forKey: Key.hudStyle.rawValue).flatMap(HUDStyle.init(rawValue:)) ?? .sideBar
         notchStyle = defaults.string(forKey: Key.notchStyle.rawValue).flatMap(NotchStyle.init(rawValue:)) ?? .black
@@ -293,6 +299,7 @@ public final class LiovaSettings {
         case hotkeysEnabled
         case customShortcuts
         case recordingControlsEnabled
+        case unlockAnimationEnabled
         case hideInFullScreen
         case musicBars
         /// Before `musicBars`: a plain on/off switch.
@@ -322,8 +329,10 @@ public final class LiovaSettings {
             defaults.removeObject(forKey: key.rawValue)
         }
     }
+}
 
-    private static func loadMusicBars(_ defaults: UserDefaults) -> MusicBarsMode {
+private extension LiovaSettings {
+    static func loadMusicBars(_ defaults: UserDefaults) -> MusicBarsMode {
         if let mode = defaults.string(forKey: Key.musicBars.rawValue).flatMap(MusicBarsMode.init(rawValue:)) {
             return mode
         }
@@ -336,7 +345,7 @@ public final class LiovaSettings {
         return .always
     }
 
-    private static func clampHoverDelay(_ value: Double) -> Double {
+    static func clampHoverDelay(_ value: Double) -> Double {
         value.isFinite ? min(max(value, hoverDelayRange.lowerBound), hoverDelayRange.upperBound) : 0.12
     }
 }

@@ -56,7 +56,7 @@ struct ExpandedView: View {
                 }
                 Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity)
+            .frame(minWidth: 0, maxWidth: .infinity)
             Color.clear.frame(width: notch.width + 8)
             HStack(spacing: 6) {
                 Spacer(minLength: 0)
@@ -77,7 +77,7 @@ struct ExpandedView: View {
                     HeaderButton(symbol: "gearshape.fill", action: openSettings)
                 }
             }
-            .frame(maxWidth: .infinity)
+            .frame(minWidth: 0, maxWidth: .infinity)
         }
         .frame(height: max(notch.height - 6, 0))
         .animation(.spring(response: 0.3, dampingFraction: 0.9), value: brief?.id)
@@ -177,11 +177,12 @@ private struct PageBar: View {
     let ids: [String]
     let highlight: Namespace.ID
 
-    /// Left of the camera is about 125 pt on a 14" MacBook: five icons, tightened.
-    static let leftLimit = 5
+    /// Left of the camera is about 125 pt on a 14" MacBook: six slim icons. The right side
+    /// shares its room with the status and the gear, so it takes the rest.
+    static let leftLimit = 6
 
     var body: some View {
-        let width: CGFloat = ids.count > 4 ? 22 : 26
+        let width: CGFloat = ids.count > 5 ? 19 : ids.count > 4 ? 22 : 26
         HStack(spacing: ids.count > 4 ? 1 : 2) {
             ForEach(ids, id: \.self) { id in
                 let isSelected = model.selectedPage == id

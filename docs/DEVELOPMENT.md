@@ -191,7 +191,7 @@ New features can be merged before they're released. Each one gets a case in
 
 - Debug builds (`make run`) show every preview feature.
 - Release builds hide them. To try one in a release build:
-  `defaults write app.liova.Liova previewFeatures -array calls hotkeys recording`, then restart Liova.
+  `defaults write app.liova.Liova previewFeatures -array calls hotkeys recording unlock`, then restart Liova.
 - To release one, delete its case and the checks that use it, and add it to `CHANGELOG.md`.
 
 Preview features stay out of the changelog until they're released.

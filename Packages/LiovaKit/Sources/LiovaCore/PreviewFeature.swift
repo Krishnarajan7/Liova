@@ -13,6 +13,8 @@ public enum PreviewFeature: String, CaseIterable, Sendable {
     case hotkeys
     /// Start, pause and stop screen recordings (OBS, macOS) from the notch.
     case recording
+    /// A short moment in the notch when the Mac is unlocked.
+    case unlock
 
     static let defaultsKey = "previewFeatures"
 

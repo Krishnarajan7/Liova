@@ -31,6 +31,7 @@ final class AppCoordinator {
     @ObservationIgnored lazy var clipboard = ClipboardFeature(settings: settings)
     @ObservationIgnored lazy var hotkeys = HotkeyFeature(settings: settings)
     @ObservationIgnored lazy var recording = RecordingFeature(engine: engine, settings: settings)
+    @ObservationIgnored private lazy var unlock = UnlockFeature(engine: engine, settings: settings)
     @ObservationIgnored lazy var headphones = HeadphonesFeature(engine: engine, settings: settings)
     @ObservationIgnored private lazy var lyrics = LyricsFeature(settings: settings)
     @ObservationIgnored private(set) lazy var weather = WeatherFeature(engine: engine, settings: settings)
@@ -102,6 +103,7 @@ final class AppCoordinator {
         clipboard.syncWithSettings()
         recording.syncWithSettings()
         configureHotkeys()
+        unlock.syncWithSettings()
         headphones.syncWithSettings()
         calendar.syncWithSettings()
         weather.syncWithSettings()
@@ -138,6 +140,7 @@ final class AppCoordinator {
                 settings.hotkeysEnabled,
                 settings.customShortcuts,
                 settings.recordingControlsEnabled,
+                settings.unlockAnimationEnabled,
                 settings.headphonesEnabled,
                 settings.calendarEnabled,
                 settings.weatherEnabled,
@@ -146,24 +149,29 @@ final class AppCoordinator {
                 settings.automaticUpdateChecks
             )
         } onChange: { [weak self] in
-            self?.notchSystem.settingsDidChange()
-            self?.battery.syncWithSettings()
-            self?.nowPlaying.syncWithSettings()
-            self?.lyrics.syncWithSettings()
-            self?.hud.syncWithSettings()
-            self?.agents.syncWithSettings()
-            self?.downloads.syncWithSettings()
-            self?.capture.syncWithSettings()
-            self?.resourceAlerts.syncWithSettings()
-            self?.calls.syncWithSettings()
-            self?.clipboard.syncWithSettings()
-            self?.recording.syncWithSettings()
-            self?.hotkeys.syncWithSettings()
-            self?.headphones.syncWithSettings()
-            self?.calendar.syncWithSettings()
-            self?.weather.syncWithSettings()
-            self?.updates.syncWithSettings()
+            self?.syncFeaturesWithSettings()
         }
+    }
+
+    private func syncFeaturesWithSettings() {
+        notchSystem.settingsDidChange()
+        battery.syncWithSettings()
+        nowPlaying.syncWithSettings()
+        lyrics.syncWithSettings()
+        hud.syncWithSettings()
+        agents.syncWithSettings()
+        downloads.syncWithSettings()
+        capture.syncWithSettings()
+        resourceAlerts.syncWithSettings()
+        calls.syncWithSettings()
+        clipboard.syncWithSettings()
+        recording.syncWithSettings()
+        hotkeys.syncWithSettings()
+        unlock.syncWithSettings()
+        headphones.syncWithSettings()
+        calendar.syncWithSettings()
+        weather.syncWithSettings()
+        updates.syncWithSettings()
     }
 
     func stop() {
@@ -186,6 +194,7 @@ final class AppCoordinator {
         clipboard.stop()
         hotkeys.stop()
         recording.stop()
+        unlock.stop()
         headphones.stop()
         calendar.stop()
         weather.stop()
@@ -371,6 +380,7 @@ extension AppCoordinator {
         renderers.register(ResourceAlertRenderer(feature: resourceAlerts), forSource: ResourceAlertPolicy.source)
         renderers.register(CallRenderer(feature: calls), forSource: CallPolicy.source)
         renderers.register(RecordingRenderer(feature: recording), forSource: RecordingPolicy.source)
+        renderers.register(UnlockRenderer(feature: unlock), forSource: UnlockPolicy.source)
         agents.onAttentionChange = { [weak self] needed in
             self?.notchSystem.setAttention(needed)
         }

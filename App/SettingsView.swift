@@ -215,6 +215,16 @@ private struct ActivitySettings: View {
             if PreviewFeature.recording.isEnabled() {
                 RecordingSection(settings: settings, recording: recording)
             }
+            if PreviewFeature.unlock.isEnabled() {
+                Section {
+                    Toggle("Welcome back when you unlock", isOn: $settings.unlockAnimationEnabled)
+                } footer: {
+                    Text(
+                        "A short moment in the notch when you unlock your Mac, with how long you were away. "
+                            + "Liova only hears that the screen unlocked; it never uses the camera."
+                    )
+                }
+            }
             Section {
                 Toggle("Camera and microphone in use", isOn: $settings.captureIndicatorEnabled)
             } footer: {
