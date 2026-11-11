@@ -151,6 +151,14 @@ struct WeatherFeatureTests {
         try await Task.sleep(for: .milliseconds(80))
     }
 
+    /// Until the feature has asked for the forecast `count` times (up to 3 s).
+    private func waitForRequests(_ count: Int, from fetcher: FakeWeather) async throws {
+        let deadline = ContinuousClock.now + .seconds(3)
+        while await fetcher.requests.count < count, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+    }
+
     @Test func offByDefaultAndTouchesNothing() async throws {
         let fetcher = FakeWeather(answer: report())
         let location = FakeLocation(.notDetermined)
@@ -218,10 +226,11 @@ struct WeatherFeatureTests {
         settings.weatherEnabled = true
         let weather = feature(fetcher, FakeLocation(.authorized))
         weather.syncWithSettings()
-        try await settle()
-        #expect(engine.activity(WeatherPolicy.rainID) != nil)
+        // Waits for the events, not a fixed time: CI machines can be slow.
+        #expect(await eventually { engine.activity(WeatherPolicy.rainID) != nil })
         engine.end(WeatherPolicy.rainID)
         weather.refresh()
+        try await waitForRequests(2, from: fetcher)
         try await settle()
         #expect(engine.activity(WeatherPolicy.rainID) == nil)
 
