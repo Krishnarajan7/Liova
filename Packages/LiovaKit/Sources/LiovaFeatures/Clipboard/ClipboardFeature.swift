@@ -33,7 +33,6 @@ public final class ClipboardFeature {
     @ObservationIgnored private let settings: LiovaSettings
     @ObservationIgnored private let watcher: any ClipboardWatching
     @ObservationIgnored private let store: ClipboardPinStore
-    @ObservationIgnored private let isAvailable: @MainActor () -> Bool
     @ObservationIgnored private let now: @Sendable () -> Date
     @ObservationIgnored private var isRunning = false
     @ObservationIgnored private var copiedTask: Task<Void, Never>?
@@ -42,19 +41,17 @@ public final class ClipboardFeature {
         settings: LiovaSettings,
         watcher: any ClipboardWatching = SystemClipboardWatcher(),
         store: ClipboardPinStore = .standard,
-        isAvailable: @escaping @MainActor () -> Bool = { PreviewFeature.clipboard.isEnabled() },
         now: @escaping @Sendable () -> Date = Date.init
     ) {
         self.settings = settings
         self.watcher = watcher
         self.store = store
-        self.isAvailable = isAvailable
         self.now = now
         items = store.load()
     }
 
     public var isEnabled: Bool {
-        settings.clipboardHistoryEnabled && isAvailable()
+        settings.clipboardHistoryEnabled
     }
 
     public func syncWithSettings() {

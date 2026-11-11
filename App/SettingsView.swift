@@ -203,16 +203,14 @@ private struct ActivitySettings: View {
                     )
                 }
             }
-            if PreviewFeature.clipboard.isEnabled() {
-                Section {
-                    Toggle("Clipboard history", isOn: $settings.clipboardHistoryEnabled)
-                } footer: {
-                    Text(
-                        "Keeps the last 30 things you copy, to copy again from the notch's Clipboard page. "
-                            + "Only in memory: forgotten when Liova quits, except what you pin. "
-                            + "Passwords and anything copied in a password manager are never kept."
-                    )
-                }
+            Section {
+                Toggle("Clipboard history", isOn: $settings.clipboardHistoryEnabled)
+            } footer: {
+                Text(
+                    "Keeps the last 30 things you copy, to copy again from the notch's Clipboard page. "
+                        + "Only in memory: forgotten when Liova quits, except what you pin. "
+                        + "Passwords and anything copied in a password manager are never kept."
+                )
             }
             if PreviewFeature.recording.isEnabled() {
                 RecordingSection(settings: settings, recording: recording)

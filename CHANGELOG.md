@@ -10,6 +10,23 @@ released, its section becomes the GitHub release notes.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-11
+
+### Added
+
+- **Clipboard history**: a Clipboard page in the notch keeps the last 30 things you copy (text,
+  links, images and files). Click one to copy it again, drag it into any app, pin what you
+  reuse. Kept in memory only, except what you pin; passwords and anything copied in a password
+  manager are never kept. Turn it off in Settings → Activities.
+- The Calendar page marks holidays and festivals from holiday calendars, and birthdays, so they
+  don't read like your own plans, and says which day it shows.
+
+### Fixed
+
+- Page icons no longer sit under the camera when many pages are on: the extra ones move to
+  the right of it.
+- Long Settings tabs scroll instead of growing past the bottom of the screen.
+
 ## [1.1.0] - 2026-11-10
 
 ### Added

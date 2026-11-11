@@ -57,7 +57,7 @@ struct ClipboardTests {
     private static func make(
         settings: LiovaSettings, watcher: FakeClipboardWatcher, store: ClipboardPinStore, clock: ClipboardClock
     ) -> ClipboardFeature {
-        ClipboardFeature(settings: settings, watcher: watcher, store: store, isAvailable: { true }, now: { clock.now })
+        ClipboardFeature(settings: settings, watcher: watcher, store: store, now: { clock.now })
     }
 
     private var texts: [String] {
