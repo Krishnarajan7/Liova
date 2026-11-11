@@ -29,6 +29,8 @@ final class AppCoordinator {
     @ObservationIgnored private lazy var resourceAlerts = ResourceAlertFeature(engine: engine, settings: settings)
     @ObservationIgnored private lazy var calls = CallFeature(engine: engine, settings: settings)
     @ObservationIgnored lazy var clipboard = ClipboardFeature(settings: settings)
+    @ObservationIgnored lazy var hotkeys = HotkeyFeature(settings: settings)
+    @ObservationIgnored lazy var recording = RecordingFeature(engine: engine, settings: settings)
     @ObservationIgnored lazy var headphones = HeadphonesFeature(engine: engine, settings: settings)
     @ObservationIgnored private lazy var lyrics = LyricsFeature(settings: settings)
     @ObservationIgnored private(set) lazy var weather = WeatherFeature(engine: engine, settings: settings)
@@ -98,6 +100,8 @@ final class AppCoordinator {
         resourceAlerts.syncWithSettings()
         calls.syncWithSettings()
         clipboard.syncWithSettings()
+        recording.syncWithSettings()
+        configureHotkeys()
         headphones.syncWithSettings()
         calendar.syncWithSettings()
         weather.syncWithSettings()
@@ -131,6 +135,9 @@ final class AppCoordinator {
                 settings.resourceAlertsEnabled,
                 settings.callControlsEnabled,
                 settings.clipboardHistoryEnabled,
+                settings.hotkeysEnabled,
+                settings.customShortcuts,
+                settings.recordingControlsEnabled,
                 settings.headphonesEnabled,
                 settings.calendarEnabled,
                 settings.weatherEnabled,
@@ -150,6 +157,8 @@ final class AppCoordinator {
             self?.resourceAlerts.syncWithSettings()
             self?.calls.syncWithSettings()
             self?.clipboard.syncWithSettings()
+            self?.recording.syncWithSettings()
+            self?.hotkeys.syncWithSettings()
             self?.headphones.syncWithSettings()
             self?.calendar.syncWithSettings()
             self?.weather.syncWithSettings()
@@ -175,6 +184,8 @@ final class AppCoordinator {
         resourceAlerts.stop()
         calls.stop()
         clipboard.stop()
+        hotkeys.stop()
+        recording.stop()
         headphones.stop()
         calendar.stop()
         weather.stop()
@@ -210,6 +221,15 @@ final class AppCoordinator {
             try? await Task.sleep(for: .seconds(12))
             self?.notchSystem.setAttention(false)
         }
+    }
+
+    /// What each global shortcut does.
+    private func configureHotkeys() {
+        hotkeys.setAction(.toggleNotch) { [weak self] in self?.notchSystem.toggle(page: nil) }
+        hotkeys.setAction(.clipboard) { [weak self] in self?.notchSystem.toggle(page: ClipboardFeature.pageID) }
+        hotkeys.setAction(.toggleRecording) { [weak self] in self?.recording.toggleRecording() }
+        hotkeys.setAction(.pauseRecording) { [weak self] in self?.recording.togglePause() }
+        hotkeys.syncWithSettings()
     }
 
     /// macOS posts this when any app's Accessibility trust changes, so Liova notices the
@@ -350,6 +370,7 @@ extension AppCoordinator {
         renderers.register(HeadphonesRenderer(feature: headphones), forSource: HeadphonesPolicy.source)
         renderers.register(ResourceAlertRenderer(feature: resourceAlerts), forSource: ResourceAlertPolicy.source)
         renderers.register(CallRenderer(feature: calls), forSource: CallPolicy.source)
+        renderers.register(RecordingRenderer(feature: recording), forSource: RecordingPolicy.source)
         agents.onAttentionChange = { [weak self] needed in
             self?.notchSystem.setAttention(needed)
         }

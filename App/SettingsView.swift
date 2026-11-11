@@ -58,8 +58,14 @@ struct SettingsPane: View {
 
     @ViewBuilder private var content: some View {
         switch tab {
-        case .general: GeneralSettings(settings: coordinator.settings, launchAtLogin: coordinator.launchAtLogin)
-        case .activities: ActivitySettings(settings: coordinator.settings, nowPlaying: coordinator.nowPlaying)
+        case .general:
+            GeneralSettings(
+                settings: coordinator.settings, launchAtLogin: coordinator.launchAtLogin, hotkeys: coordinator.hotkeys
+            )
+        case .activities:
+            ActivitySettings(
+                settings: coordinator.settings, nowPlaying: coordinator.nowPlaying, recording: coordinator.recording
+            )
         case .huds: HUDSettings(settings: coordinator.settings, hud: coordinator.hud)
         case .weather: WeatherSettings(settings: coordinator.settings, weather: coordinator.weather)
         case .agents: AgentSettings(settings: coordinator.settings)
@@ -72,6 +78,7 @@ struct SettingsPane: View {
 private struct GeneralSettings: View {
     @Bindable var settings: LiovaSettings
     let launchAtLogin: LaunchAtLogin
+    let hotkeys: HotkeyFeature
 
     var body: some View {
         Form {
@@ -113,6 +120,9 @@ private struct GeneralSettings: View {
                 .disabled(!settings.openOnHover)
                 Toggle("Haptic feedback on trackpads", isOn: $settings.hapticsEnabled)
             }
+            if PreviewFeature.hotkeys.isEnabled() {
+                ShortcutSection(settings: settings, hotkeys: hotkeys)
+            }
         }
         .formStyle(.grouped)
     }
@@ -121,6 +131,7 @@ private struct GeneralSettings: View {
 private struct ActivitySettings: View {
     @Bindable var settings: LiovaSettings
     let nowPlaying: NowPlayingFeature
+    let recording: RecordingFeature
 
     var body: some View {
         Form {
@@ -202,6 +213,9 @@ private struct ActivitySettings: View {
                             + "Passwords and anything copied in a password manager are never kept."
                     )
                 }
+            }
+            if PreviewFeature.recording.isEnabled() {
+                RecordingSection(settings: settings, recording: recording)
             }
             Section {
                 Toggle("Camera and microphone in use", isOn: $settings.captureIndicatorEnabled)

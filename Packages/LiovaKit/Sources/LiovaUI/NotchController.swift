@@ -129,6 +129,30 @@ public final class NotchController {
         handle(needed ? .attentionRequested : .attentionCleared)
     }
 
+    /// Opens on `page`, from a keyboard shortcut: it stays open like a notch opened for
+    /// attention, until the shortcut is pressed again, a click lands elsewhere, or the
+    /// pointer visits and leaves.
+    func show(page: String) {
+        model.selectedPage = page
+        handle(.attentionRequested)
+    }
+
+    /// Closes a notch the shortcut opened (or one the pointer isn't in).
+    func hide() {
+        handle(.attentionCleared)
+        if interaction.presentation == .expanded, !interaction.isPointerInside {
+            handle(.clickedOutside)
+        }
+    }
+
+    var isExpanded: Bool {
+        interaction.presentation == .expanded
+    }
+
+    var selectedPage: String {
+        model.selectedPage
+    }
+
     public func setCoveredByFullScreen(_ covered: Bool) {
         guard model.isCoveredByFullScreen != covered else { return }
         model.isCoveredByFullScreen = covered

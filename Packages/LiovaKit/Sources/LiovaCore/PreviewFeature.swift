@@ -11,6 +11,10 @@ public enum PreviewFeature: String, CaseIterable, Sendable {
     case calls
     /// What you copied lately, to copy again from the notch.
     case clipboard
+    /// Global keyboard shortcuts for the notch.
+    case hotkeys
+    /// Start, pause and stop screen recordings (OBS, macOS) from the notch.
+    case recording
 
     static let defaultsKey = "previewFeatures"
 

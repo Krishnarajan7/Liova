@@ -36,6 +36,12 @@ extension AppCoordinator {
             isAvailable: { clipboard.isEnabled },
             content: { AnyView(ClipboardPage(feature: clipboard)) }
         ))
+        let recording = recording
+        chrome.addPage(NotchChrome.Page(
+            id: RecordingFeature.pageID, symbol: "record.circle", title: "Record",
+            isAvailable: { recording.isEnabled },
+            content: { AnyView(RecordingPage(feature: recording)) }
+        ))
         chrome.dropPageID = ShelfFeature.pageID
         let battery = battery
         let capture = capture

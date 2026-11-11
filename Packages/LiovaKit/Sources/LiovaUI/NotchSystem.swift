@@ -64,6 +64,23 @@ public final class NotchSystem {
         target?.setAttention(true)
     }
 
+    /// For keyboard shortcuts: opens the notch on `page` (Home when nil) on the display with
+    /// the pointer. Pressed again while it shows that page, it closes.
+    public func toggle(page: String?) {
+        let page = page ?? NotchChrome.homePageID
+        guard chrome.allPageIDs.contains(page) else { return }
+        let pointer = NSEvent.mouseLocation
+        guard let target = controllers.values.first(where: { $0.containsPointer(pointer) })
+            ?? controllers.values.first(where: { $0.display.isMain })
+            ?? controllers.values.first
+        else { return }
+        if target.isExpanded, target.selectedPage == page {
+            target.hide()
+        } else {
+            target.show(page: page)
+        }
+    }
+
     private func draggedFile(at point: CGPoint) {
         let pasteboard = NSPasteboard(name: .drag)
         _ = fileDrag.dragged(dragPasteboardChangeCount: pasteboard.changeCount) {

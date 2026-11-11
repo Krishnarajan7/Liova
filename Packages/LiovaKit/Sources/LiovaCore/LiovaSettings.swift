@@ -87,6 +87,25 @@ public final class LiovaSettings {
         didSet { store(callControlsEnabled, .callControlsEnabled) }
     }
 
+    /// Global keyboard shortcuts for the notch.
+    public var hotkeysEnabled: Bool {
+        didSet { store(hotkeysEnabled, .hotkeysEnabled) }
+    }
+
+    /// Shortcuts the user changed; the rest use `HotkeyAction.defaultShortcut`.
+    public var customShortcuts: [String: Shortcut] {
+        didSet {
+            if let data = try? JSONEncoder().encode(customShortcuts) {
+                store(data, .customShortcuts)
+            }
+        }
+    }
+
+    /// While OBS or macOS records the screen: the time, Pause and Stop in the notch.
+    public var recordingControlsEnabled: Bool {
+        didSet { store(recordingControlsEnabled, .recordingControlsEnabled) }
+    }
+
     /// Keep what you copy, to copy it again from the notch.
     public var clipboardHistoryEnabled: Bool {
         didSet { store(clipboardHistoryEnabled, .clipboardHistoryEnabled) }
@@ -221,6 +240,10 @@ public final class LiovaSettings {
         resourceAlertsEnabled = defaults.object(forKey: Key.resourceAlertsEnabled.rawValue) as? Bool ?? true
         callControlsEnabled = defaults.object(forKey: Key.callControlsEnabled.rawValue) as? Bool ?? true
         clipboardHistoryEnabled = defaults.object(forKey: Key.clipboardHistoryEnabled.rawValue) as? Bool ?? true
+        hotkeysEnabled = defaults.object(forKey: Key.hotkeysEnabled.rawValue) as? Bool ?? true
+        customShortcuts = defaults.data(forKey: Key.customShortcuts.rawValue)
+            .flatMap { try? JSONDecoder().decode([String: Shortcut].self, from: $0) } ?? [:]
+        recordingControlsEnabled = defaults.object(forKey: Key.recordingControlsEnabled.rawValue) as? Bool ?? true
         hasSeenWelcome = defaults.object(forKey: Key.hasSeenWelcome.rawValue) as? Bool ?? false
         hudStyle = defaults.string(forKey: Key.hudStyle.rawValue).flatMap(HUDStyle.init(rawValue:)) ?? .sideBar
         notchStyle = defaults.string(forKey: Key.notchStyle.rawValue).flatMap(NotchStyle.init(rawValue:)) ?? .black
@@ -267,6 +290,9 @@ public final class LiovaSettings {
         case resourceAlertsEnabled
         case callControlsEnabled
         case clipboardHistoryEnabled
+        case hotkeysEnabled
+        case customShortcuts
+        case recordingControlsEnabled
         case hideInFullScreen
         case musicBars
         /// Before `musicBars`: a plain on/off switch.
@@ -312,74 +338,5 @@ public final class LiovaSettings {
 
     private static func clampHoverDelay(_ value: Double) -> Double {
         value.isFinite ? min(max(value, hoverDelayRange.lowerBound), hoverDelayRange.upperBound) : 0.12
-    }
-}
-
-/// What the notch is made of.
-public enum NotchStyle: String, CaseIterable, Codable, Sendable {
-    /// Solid black, one with the camera housing.
-    case black
-    /// Liquid Glass (a blur before macOS 26) once open; the closed notch stays black so it
-    /// still blends with the camera housing.
-    case glass
-}
-
-/// Where the volume and brightness HUD appears.
-public enum HUDStyle: String, CaseIterable, Codable, Sendable {
-    /// A vertical level bar at the right edge of the screen.
-    case sideBar
-    /// Inside the notch.
-    case notch
-}
-
-/// When the closed-notch music bars move.
-public enum MusicBarsMode: String, CaseIterable, Codable, Sendable {
-    case always
-    /// Moving while on power, resting on battery.
-    case pluggedIn
-    /// Always resting.
-    case off
-
-    /// Whether the bars should move right now.
-    public func animates(onBattery: Bool) -> Bool {
-        switch self {
-        case .always: true
-        case .pluggedIn: !onBattery
-        case .off: false
-        }
-    }
-}
-
-/// A place to show weather for, picked by name.
-public struct WeatherPlace: Codable, Equatable, Sendable, Identifiable {
-    /// What the user sees: "Chennai, Tamil Nadu, India".
-    public var name: String
-    public var latitude: Double
-    public var longitude: Double
-
-    public var id: String {
-        "\(name)|\(latitude)|\(longitude)"
-    }
-
-    public init(name: String, latitude: Double, longitude: Double) {
-        self.name = name
-        self.latitude = latitude
-        self.longitude = longitude
-    }
-}
-
-public enum TemperatureUnit: String, CaseIterable, Codable, Sendable {
-    /// Whatever the Mac's region uses.
-    case automatic
-    case celsius
-    case fahrenheit
-
-    /// Fahrenheit or not, with `automatic` resolved through `locale`.
-    public func usesFahrenheit(locale: Locale = .current) -> Bool {
-        switch self {
-        case .automatic: locale.measurementSystem == .us
-        case .celsius: false
-        case .fahrenheit: true
-        }
     }
 }
