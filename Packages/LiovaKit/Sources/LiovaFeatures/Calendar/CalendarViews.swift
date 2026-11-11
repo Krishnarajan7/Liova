@@ -77,12 +77,17 @@ public struct CalendarPage: View {
             switch feature.access {
             case .granted:
                 let today = feature.events.filter { Calendar.current.isDateInToday($0.start) || $0.start < .now }
-                if today.isEmpty {
-                    Message(symbol: "calendar", text: "Nothing else on your calendar today.")
-                } else {
-                    ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 6) {
-                            ForEach(today.prefix(8)) { EventRow(event: $0, feature: feature) }
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Today · \(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide)))")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.5))
+                    if today.isEmpty {
+                        Message(symbol: "calendar", text: "Nothing else on your calendar today.")
+                    } else {
+                        ScrollView(.vertical, showsIndicators: false) {
+                            VStack(spacing: 6) {
+                                ForEach(today.prefix(8)) { EventRow(event: $0, feature: feature) }
+                            }
                         }
                     }
                 }
@@ -116,13 +121,21 @@ private struct EventRow: View {
     let event: UpcomingEvent
     let feature: CalendarFeature
 
+    private var kind: EventKind {
+        EventKind(event)
+    }
+
     var body: some View {
         HStack(spacing: 8) {
-            Circle().fill(event.calendarColor.color).frame(width: 7, height: 7)
-            Text(event.isAllDay ? "All day" : CalendarPolicy.timeFormatter.string(from: event.start))
+            Image(systemName: kind.symbol)
+                // A plain event keeps the small dot; the others are symbols you can read.
+                .font(.system(size: kind == .timed ? 7 : 10, weight: .semibold))
+                .foregroundStyle(event.calendarColor.color)
+                .frame(width: 14)
+            Text(kind.when(event))
                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                 .monospacedDigit()
-                .foregroundStyle(.white.opacity(0.55))
+                .foregroundStyle(kind == .holiday ? Color.orange : .white.opacity(0.55))
                 .frame(width: 58, alignment: .leading)
             Text(event.title.isEmpty ? "Untitled event" : event.title)
                 .font(.system(size: 12, weight: .medium))
@@ -150,5 +163,40 @@ private struct Message: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 14)
+    }
+}
+
+/// What a row is, at a glance: a festival from a holiday calendar shouldn't look like a
+/// plan of yours.
+enum EventKind: Equatable {
+    case holiday, birthday, meeting, allDay, timed
+
+    init(_ event: UpcomingEvent) {
+        switch event.origin {
+        case .holiday: self = .holiday
+        case .birthday: self = .birthday
+        case .own where event.joinURL != nil: self = .meeting
+        case .own: self = event.isAllDay ? .allDay : .timed
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .holiday: "party.popper.fill"
+        case .birthday: "gift.fill"
+        case .meeting: "video.fill"
+        case .allDay: "sun.max.fill"
+        case .timed: "circle.fill"
+        }
+    }
+
+    /// The left column: what it is for all-day things, when it starts for the rest.
+    func when(_ event: UpcomingEvent) -> String {
+        switch self {
+        case .holiday: "Holiday"
+        case .birthday: "Birthday"
+        case .allDay: "All day"
+        case .meeting, .timed: CalendarPolicy.timeFormatter.string(from: event.start)
+        }
     }
 }

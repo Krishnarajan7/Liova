@@ -89,3 +89,27 @@ struct CalendarAccessTests {
         #expect(entitlements["com.apple.security.personal-information.location"] as? Bool == true)
     }
 }
+
+struct EventKindTests {
+    @Test func holidayCalendarsAreRecognised() {
+        for title in ["Holidays in India", "Indian Holidays", "Feiertage in Deutschland", "Jours fériés", "日本の祝日"] {
+            #expect(CalendarPolicy.origin(isBirthdayCalendar: false, calendarTitle: title) == .holiday)
+        }
+        #expect(CalendarPolicy.origin(isBirthdayCalendar: false, calendarTitle: "Work") == .own)
+        #expect(CalendarPolicy.origin(isBirthdayCalendar: true, calendarTitle: "Birthdays") == .birthday)
+    }
+
+    @Test func aFestivalReadsAsAHolidayNotAPlan() {
+        var festival = event("Bhai Dooj", startsIn: 0, allDay: true)
+        festival.origin = .holiday
+        #expect(EventKind(festival) == .holiday)
+        #expect(EventKind(festival).when(festival) == "Holiday")
+        #expect(EventKind(event("Offsite", startsIn: 0, allDay: true)).when(event(
+            "Offsite",
+            startsIn: 0,
+            allDay: true
+        )) == "All day")
+        #expect(EventKind(event("Standup", startsIn: 5, join: true)) == .meeting)
+        #expect(EventKind(event("Lunch", startsIn: 5)) == .timed)
+    }
+}

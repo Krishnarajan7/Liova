@@ -99,6 +99,7 @@ private struct ClipboardCard: View {
         }
         .padding(8)
         .frame(width: 128, height: 96)
+        .clipped()
         .background(.white.opacity(isHovered ? 0.13 : 0.07), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay {
             if copied {
@@ -189,10 +190,14 @@ private struct ClipboardPreview: View {
             }
         case let .image(data, _):
             if let image = ClipboardText.thumbnail(item.id, data) {
-                Image(nsImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // Fills the space the card gives it and is cropped there: on its own, a
+                // filled image takes its full width and spills over the next card.
+                Color.clear
+                    .overlay {
+                        Image(nsImage: image)
+                            .resizable()
+                            .scaledToFill()
+                    }
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             } else {
                 Label("Image", systemImage: "photo")

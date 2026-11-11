@@ -173,7 +173,11 @@ public final class CalendarFeature {
                 green: color.map { Double($0.greenComponent) } ?? 0.6,
                 blue: color.map { Double($0.blueComponent) } ?? 1
             ),
-            joinURL: CalendarPolicy.joinURL(url: event.url, location: event.location, notes: event.notes)
+            joinURL: CalendarPolicy.joinURL(url: event.url, location: event.location, notes: event.notes),
+            origin: CalendarPolicy.origin(
+                isBirthdayCalendar: event.calendar.type == .birthday,
+                calendarTitle: event.calendar.title
+            )
         )
     }
 }

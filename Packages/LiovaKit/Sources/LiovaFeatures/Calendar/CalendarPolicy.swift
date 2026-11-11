@@ -11,10 +11,13 @@ public struct UpcomingEvent: Identifiable, Equatable, Sendable {
     public var calendarColor: CalendarColor
     /// A video-call link found in the event's URL, location or notes.
     public var joinURL: URL?
+    /// Where it comes from: a holiday calendar's festival reads differently from your own plans.
+    public var origin: EventOrigin
 
     public init(
         id: String, title: String, start: Date, end: Date, isAllDay: Bool = false,
-        calendarColor: CalendarColor = CalendarColor(red: 0.3, green: 0.6, blue: 1), joinURL: URL? = nil
+        calendarColor: CalendarColor = CalendarColor(red: 0.3, green: 0.6, blue: 1), joinURL: URL? = nil,
+        origin: EventOrigin = .own
     ) {
         self.id = id
         self.title = title
@@ -23,7 +26,17 @@ public struct UpcomingEvent: Identifiable, Equatable, Sendable {
         self.isAllDay = isAllDay
         self.calendarColor = calendarColor
         self.joinURL = joinURL
+        self.origin = origin
     }
+}
+
+/// Your own events, or ones a calendar adds for you.
+public enum EventOrigin: Equatable, Sendable {
+    case own
+    /// Public holidays and festivals, from a holiday calendar (macOS adds one per region).
+    case holiday
+    /// From Contacts' birthdays calendar.
+    case birthday
 }
 
 public struct CalendarColor: Equatable, Sendable {
@@ -81,6 +94,17 @@ public enum CalendarPolicy {
             candidates.append(now + (untilStart.truncatingRemainder(dividingBy: 60) + 0.5))
         }
         return candidates.filter { $0 > now }.min()
+    }
+
+    /// Holiday calendars, Apple's or Google's, are named after holidays: "Holidays in India",
+    /// "Indian Holidays", "Feiertage", "Jours fériés".
+    public static func origin(isBirthdayCalendar: Bool, calendarTitle: String) -> EventOrigin {
+        if isBirthdayCalendar {
+            return .birthday
+        }
+        let title = calendarTitle.lowercased()
+        let words = ["holiday", "festival", "feiertag", "férié", "festivo", "feriado", "祝日", "节假日"]
+        return words.contains(where: title.contains) ? .holiday : .own
     }
 
     /// Finds a Zoom, Google Meet, Teams, Webex or FaceTime link.
