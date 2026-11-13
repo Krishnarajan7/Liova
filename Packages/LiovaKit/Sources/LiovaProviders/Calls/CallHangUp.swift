@@ -6,8 +6,12 @@ public enum HangUpResult: Equatable, Sendable {
     case done
     /// Liova needs Accessibility access to press the app's button.
     case needsPermission
-    /// No leave or end button was found (in a browser: the call's tab isn't the open one).
+    /// No leave or end button was found.
     case notFound
+    /// A browser has the microphone but shows no Leave button: a call's page before joining
+    /// ("Ready to join?") or after leaving keeps the mic on. The browser is brought forward
+    /// so its tab can be closed.
+    case tabStillOpen
 }
 
 @MainActor
@@ -48,6 +52,10 @@ public final class AccessibilityHangUp: CallHangingUp {
         if let shortcut = CallButtonLabels.shortcut(for: user.bundleID) {
             Self.send(shortcut, to: user.pid)
             return .done
+        }
+        if CallButtonLabels.browsers.contains(user.bundleID) {
+            NSRunningApplication(processIdentifier: user.pid)?.activate()
+            return .tabStillOpen
         }
         return .notFound
     }
@@ -138,6 +146,12 @@ public enum CallButtonLabels {
         guard !text.contains("for all"), !text.contains("for everyone") else { return false }
         return ["leave meeting", "leave", "end call", "leave call"].contains(text)
     }
+
+    /// Browsers, where a "call" is a web page that may keep the mic without being in one.
+    public static let browsers: Set = [
+        "com.google.Chrome", "com.apple.Safari", "company.thebrowser.Browser", "org.mozilla.firefox",
+        "com.microsoft.edgemac", "com.brave.Browser",
+    ]
 
     struct Shortcut {
         var key: CGKeyCode

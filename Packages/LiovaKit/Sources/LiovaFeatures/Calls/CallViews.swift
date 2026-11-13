@@ -104,6 +104,9 @@ private struct CallCard: View {
         case .notFound:
             Text("Couldn't find its Leave button. Bring the call's window or tab forward.")
                 .foregroundStyle(LoadLevel.busy.color)
+        case .tabStillOpen:
+            Text("The page still has your mic. Close its tab to turn it off.")
+                .foregroundStyle(LoadLevel.busy.color)
         case .done, nil:
             Text(feature.isMuted ? "Your microphone is off" : "Your microphone is on")
                 .foregroundStyle(feature.isMuted ? CallColors.muted : .white.opacity(0.55))

@@ -327,8 +327,9 @@ private extension AppCoordinator {
 
 extension AppCoordinator {
     /// Beside the camera in the open notch. Never squeezed: when everything doesn't fit,
-    /// details drop one at a time (headphones level, charging bolt, battery percentage),
-    /// each still in its tooltip, instead of wrapping.
+    /// details drop one at a time (headphones level, charging bolt, battery percentage, then
+    /// camera and mic icons become dots, then headphones and battery go), each still in its
+    /// tooltip, instead of wrapping or pushing the gear past the notch's edge.
     static func trailingStatus(
         battery: BatteryFeature, capture: CaptureIndicatorFeature, headphones: HeadphonesFeature
     ) -> AnyView {
@@ -353,6 +354,17 @@ extension AppCoordinator {
                 HeadphonesStatusView(feature: headphones, isCompact: true)
                 BatteryStatusView(feature: battery, detail: .icon)
             }
+            HStack(spacing: 5) {
+                CaptureStatusView(feature: capture, isCompact: true)
+                HeadphonesStatusView(feature: headphones, isCompact: true)
+                BatteryStatusView(feature: battery, detail: .icon)
+            }
+            // The last resort must always fit: the camera and mic dots, which matter most.
+            HStack(spacing: 5) {
+                CaptureStatusView(feature: capture, isCompact: true)
+                BatteryStatusView(feature: battery, detail: .icon)
+            }
+            CaptureStatusView(feature: capture, isCompact: true)
         })
     }
 }

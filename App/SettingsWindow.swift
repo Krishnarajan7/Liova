@@ -19,15 +19,19 @@ final class SettingsWindow {
     }
 
     /// Liova lives in the menu bar, so ⌘Q in Settings means "done with Settings", not "quit
-    /// the notch". ⌘Q and ⌘W close the window; Quit stays in the menu bar menu.
+    /// the notch". ⌘Q and ⌘W close the window, ⌘M minimizes it; Quit stays in the menu bar menu.
     private func watchCloseKeys() {
         guard keyMonitor == nil else { return }
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let window = self?.window, window.isKeyWindow,
                   event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
-                  ["q", "w"].contains(event.charactersIgnoringModifiers?.lowercased())
+                  let key = event.charactersIgnoringModifiers?.lowercased(), ["q", "w", "m"].contains(key)
             else { return event }
-            window.performClose(nil)
+            if key == "m" {
+                window.performMiniaturize(nil)
+            } else {
+                window.performClose(nil)
+            }
             return nil
         }
     }
@@ -38,7 +42,9 @@ final class SettingsWindow {
         if let tab, let index = SettingsTab.allCases.firstIndex(of: tab) {
             tabs?.selectedTabViewItemIndex = index
         }
-        if !window.isVisible {
+        if window.isMiniaturized {
+            window.deminiaturize(nil)
+        } else if !window.isVisible {
             window.center()
         }
         // An agent app has to step forward itself, or the window opens behind the frontmost app.
@@ -62,7 +68,7 @@ final class SettingsWindow {
             tabs.addTabViewItem(item)
         }
         let window = NSWindow(contentViewController: tabs)
-        window.styleMask = [.titled, .closable]
+        window.styleMask = [.titled, .closable, .miniaturizable]
         window.toolbarStyle = .preference
         window.isReleasedWhenClosed = false
         window.setFrameAutosaveName("LiovaSettings")

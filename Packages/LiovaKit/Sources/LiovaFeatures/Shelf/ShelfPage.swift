@@ -16,15 +16,24 @@ public struct ShelfPage: View {
     public var body: some View {
         Group {
             if isDragging {
+                // The notch stays at full height while files are dragged in (no resizing
+                // under the pointer), so the targets fill all of it.
                 HStack(spacing: 10) {
-                    DropZone(title: "Keep on Shelf", symbol: "tray.and.arrow.down.fill", tint: .white) { urls in
+                    DropZone(
+                        title: "Keep on Shelf", detail: "Drag it out again anywhere",
+                        symbol: "tray.and.arrow.down.fill", tint: .white
+                    ) { urls in
                         withAnimation(Motion.list) { _ = feature.add(urls) }
                     }
-                    DropZone(title: "AirDrop", symbol: "dot.radiowaves.left.and.right", tint: .blue) { urls in
+                    DropZone(
+                        title: "AirDrop", detail: "To a nearby device",
+                        symbol: "dot.radiowaves.left.and.right", tint: .blue
+                    ) { urls in
                         feature.airDrop(urls: urls)
                     }
-                    .frame(width: 130)
+                    .frame(width: 150)
                 }
+                .frame(height: NotchLayout.fullPageHeight)
                 .transition(.opacity.combined(with: .scale(scale: 0.97)))
             } else if feature.items.isEmpty {
                 EmptyShelf()
@@ -43,29 +52,42 @@ public struct ShelfPage: View {
 /// A target for dropped files that lights up while files hover over it.
 private struct DropZone: View {
     let title: String
+    let detail: String
     let symbol: String
     let tint: Color
     let onDrop: ([URL]) -> Void
     @State private var isTargeted = false
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
             Image(systemName: symbol)
-                .font(.system(size: 20, weight: .semibold))
+                .font(.system(size: 24, weight: .semibold))
                 .symbolEffect(.bounce, value: isTargeted)
-            Text(title)
-                .font(.system(size: 12, weight: .semibold))
+                .frame(height: 28)
+            VStack(spacing: 2) {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                Text(detail)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.white.opacity(isTargeted ? 0.7 : 0.4))
+                    .lineLimit(1)
+            }
         }
-        .foregroundStyle(isTargeted ? tint : .white.opacity(0.6))
+        .foregroundStyle(isTargeted ? tint : .white.opacity(0.75))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(tint.opacity(isTargeted ? 0.16 : 0.05))
+            // Solid enough to hide what's behind a glass notch.
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(.black.opacity(0.35))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(tint.opacity(isTargeted ? 0.16 : 0.05))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .strokeBorder(
-                            tint.opacity(isTargeted ? 0.8 : 0.25),
-                            style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])
+                            tint.opacity(isTargeted ? 0.8 : 0.22),
+                            style: StrokeStyle(lineWidth: 1.5, dash: [6, 5])
                         )
                 )
         }

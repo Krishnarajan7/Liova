@@ -35,6 +35,9 @@ public enum NotchLayout {
     public static let expandedBodySize = CGSize(width: 480, height: 152)
     /// The shortest the open notch gets below the camera row.
     public static let minExpandedBodyHeight: CGFloat = 64
+    /// The page's room in the full-height open notch (while files are dragged in): the body
+    /// less the header gap and bottom margin `ExpandedView` puts around the page.
+    public static let fullPageHeight: CGFloat = expandedBodySize.height - 18
     /// Room around the expanded notch for its shadow. Part of the fixed panel.
     public static let shadowMargin: CGFloat = 24
     /// How much the notch grows on hover.

@@ -148,13 +148,11 @@ public enum CallPolicy {
 
     /// Apps made for calls come first: with Zoom and a dictation app both recording, it's
     /// the Zoom call.
-    static let callApps: Set = [
+    static let callApps = Set<String>([
         "us.zoom.xos", "com.microsoft.teams2", "com.microsoft.teams", "com.apple.FaceTime",
         "com.tinyspeck.slackmacgap", "com.hnc.Discord", "net.whatsapp.WhatsApp", "desktop.WhatsApp",
         "Cisco-Systems.Spark", "com.cisco.webexmeetingsapp", "com.skype.skype", "ru.keepcoder.Telegram",
-        "com.google.Chrome", "com.apple.Safari", "company.thebrowser.Browser", "org.mozilla.firefox",
-        "com.microsoft.edgemac", "com.brave.Browser",
-    ]
+    ]).union(CallButtonLabels.browsers)
 
     static func callApp(among users: [MicrophoneUser]) -> MicrophoneUser? {
         users.first { callApps.contains($0.bundleID) } ?? users.first

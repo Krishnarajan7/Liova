@@ -163,3 +163,12 @@ struct CallTests {
         #expect(hidden.call == nil)
     }
 }
+
+struct CallBrowserTests {
+    @Test func browsersStillCountAsCallApps() {
+        for browser in CallButtonLabels.browsers {
+            #expect(CallPolicy.callApps.contains(browser))
+        }
+        #expect(CallPolicy.callApps.contains("us.zoom.xos"))
+    }
+}

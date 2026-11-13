@@ -113,28 +113,37 @@ public enum CapturePolicy {
 /// Dots for the open notch header: green for camera, orange for microphone.
 public struct CaptureStatusView: View {
     let feature: CaptureIndicatorFeature
+    /// Dots instead of icons, like macOS's own indicators, for a crowded header.
+    let isCompact: Bool
 
-    public init(feature: CaptureIndicatorFeature) {
+    public init(feature: CaptureIndicatorFeature, isCompact: Bool = false) {
         self.feature = feature
+        self.isCompact = isCompact
     }
 
     public var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: isCompact ? 3 : 4) {
             if feature.state.isCameraOn {
-                Image(systemName: "video.fill")
-                    .font(.system(size: 8.5, weight: .bold))
-                    .foregroundStyle(.green)
+                indicator(symbol: "video.fill", color: .green)
                     .help("A camera is in use")
                     .transition(.scale.combined(with: .opacity))
             }
             if feature.state.isMicrophoneOn {
-                Image(systemName: "mic.fill")
-                    .font(.system(size: 8.5, weight: .bold))
-                    .foregroundStyle(.orange)
+                indicator(symbol: "mic.fill", color: .orange)
                     .help("A microphone is in use")
                     .transition(.scale.combined(with: .opacity))
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: feature.state)
+    }
+
+    @ViewBuilder private func indicator(symbol: String, color: Color) -> some View {
+        if isCompact {
+            Circle().fill(color).frame(width: 6, height: 6)
+        } else {
+            Image(systemName: symbol)
+                .font(.system(size: 8.5, weight: .bold))
+                .foregroundStyle(color)
+        }
     }
 }
