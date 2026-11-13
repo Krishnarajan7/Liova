@@ -10,6 +10,23 @@ released, its section becomes the GitHub release notes.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-13
+
+### Added
+
+- **Keyboard shortcuts** that work in every app: ⌃⌥N opens or closes the notch, ⌃⌥V opens
+  Clipboard history. Change them, or turn them off, in Settings → General. If another app
+  already uses one, Settings says so.
+- Settings can be minimized (the yellow button, or ⌘M).
+
+### Fixed
+
+- Dropping a file on the open notch shows two large targets, Keep on Shelf and AirDrop, that
+  fill the notch instead of leaving empty space.
+- The status icons beside the camera no longer slide under it or past the edge when many are
+  on: the camera and microphone become small dots first, then less important icons step aside.
+- The open notch keeps its width when many pages are on.
+
 ## [1.2.0] - 2026-11-11
 
 ### Added

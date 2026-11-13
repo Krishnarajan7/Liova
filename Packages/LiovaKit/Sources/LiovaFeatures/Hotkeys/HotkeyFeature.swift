@@ -12,7 +12,6 @@ public final class HotkeyFeature {
 
     @ObservationIgnored private let settings: LiovaSettings
     @ObservationIgnored private let hotkeys: any HotkeyRegistering
-    @ObservationIgnored private let isAvailable: @MainActor () -> Bool
     @ObservationIgnored private var actions: [HotkeyAction: @MainActor () -> Void] = [:]
     @ObservationIgnored private var registered: [HotkeyAction: Shortcut] = [:]
     /// While Settings records a new shortcut, the current ones stay quiet.
@@ -20,16 +19,19 @@ public final class HotkeyFeature {
 
     public init(
         settings: LiovaSettings,
-        hotkeys: any HotkeyRegistering = GlobalHotkeys(),
-        isAvailable: @escaping @MainActor () -> Bool = { PreviewFeature.hotkeys.isEnabled() }
+        hotkeys: any HotkeyRegistering = GlobalHotkeys()
     ) {
         self.settings = settings
         self.hotkeys = hotkeys
-        self.isAvailable = isAvailable
     }
 
     public var isEnabled: Bool {
-        settings.hotkeysEnabled && isAvailable()
+        settings.hotkeysEnabled
+    }
+
+    /// The shortcuts that do something, in order: Settings lists only these.
+    public var actionsInUse: [HotkeyAction] {
+        HotkeyAction.allCases.filter { actions[$0] != nil }
     }
 
     /// What each shortcut does. Actions without a handler aren't registered.

@@ -12,7 +12,7 @@ struct ShortcutSection: View {
     var body: some View {
         Section {
             Toggle("Keyboard shortcuts", isOn: $settings.hotkeysEnabled)
-            ForEach(HotkeyAction.allCases, id: \.self) { action in
+            ForEach(hotkeys.actionsInUse, id: \.self) { action in
                 LabeledContent(action.title) {
                     HStack(spacing: 6) {
                         if hotkeys.taken.contains(action) {

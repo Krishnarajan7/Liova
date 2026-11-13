@@ -258,3 +258,18 @@ export const Glass = (p: IconProps) => (
     <path d="M8.5 13.2c2.2-.9 4.6-1.3 7-1.2.5 0 .5.7 0 .8-2.3.2-4.5.8-6.6 1.8-.6.3-1-.6-.4-1.4Z" />
   </Icon>
 );
+
+export const Clipboard = (p: IconProps) => (
+  <Icon {...p}>
+    <path fillOpacity="0.35" d="M7 4h10a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3Z" />
+    <path d="M9.5 2h5A1.5 1.5 0 0 1 16 3.5v1A1.5 1.5 0 0 1 14.5 6h-5A1.5 1.5 0 0 1 8 4.5v-1A1.5 1.5 0 0 1 9.5 2Z" />
+    <path d="M8 10h8a1 1 0 0 1 0 2H8a1 1 0 0 1 0-2Zm0 4h5a1 1 0 0 1 0 2H8a1 1 0 0 1 0-2Z" />
+  </Icon>
+);
+
+export const Keys = (p: IconProps) => (
+  <Icon {...p}>
+    <path fillOpacity="0.35" d="M4 6h16a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H4a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3Z" />
+    <path d="M5 9h2v2H5Zm4 0h2v2H9Zm4 0h2v2h-2Zm4 0h2v2h-2ZM7 13.5h10a1 1 0 0 1 0 2H7a1 1 0 0 1 0-2Z" />
+  </Icon>
+);

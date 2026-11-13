@@ -36,7 +36,7 @@ struct HotkeyFeatureTests {
 
     init() {
         settings = LiovaSettings(defaults: scratch.defaults)
-        feature = HotkeyFeature(settings: settings, hotkeys: hotkeys, isAvailable: { true })
+        feature = HotkeyFeature(settings: settings, hotkeys: hotkeys)
     }
 
     @Test func pressingAShortcutRunsItsAction() {

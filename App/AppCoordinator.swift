@@ -236,8 +236,10 @@ final class AppCoordinator {
     private func configureHotkeys() {
         hotkeys.setAction(.toggleNotch) { [weak self] in self?.notchSystem.toggle(page: nil) }
         hotkeys.setAction(.clipboard) { [weak self] in self?.notchSystem.toggle(page: ClipboardFeature.pageID) }
-        hotkeys.setAction(.toggleRecording) { [weak self] in self?.recording.toggleRecording() }
-        hotkeys.setAction(.pauseRecording) { [weak self] in self?.recording.togglePause() }
+        if PreviewFeature.recording.isEnabled() {
+            hotkeys.setAction(.toggleRecording) { [weak self] in self?.recording.toggleRecording() }
+            hotkeys.setAction(.pauseRecording) { [weak self] in self?.recording.togglePause() }
+        }
         hotkeys.syncWithSettings()
     }
 
@@ -384,17 +386,13 @@ extension AppCoordinator {
             forSource: UpdatePolicy.source
         )
         renderers.register(DownloadsRenderer(feature: downloads), forSource: DownloadsPolicy.source)
-        hud.sideHUD = { [volumeBar, brightnessBar] state in
-            (state.kind == .brightness ? brightnessBar : volumeBar).show(state)
-        }
+        hud.sideHUD = { [volumeBar, brightnessBar] in ($0.kind == .brightness ? brightnessBar : volumeBar).show($0) }
         renderers.register(AgentIslandRenderer(feature: agents), forSource: AgentIslandPolicy.source)
         renderers.register(HeadphonesRenderer(feature: headphones), forSource: HeadphonesPolicy.source)
         renderers.register(ResourceAlertRenderer(feature: resourceAlerts), forSource: ResourceAlertPolicy.source)
         renderers.register(CallRenderer(feature: calls), forSource: CallPolicy.source)
         renderers.register(RecordingRenderer(feature: recording), forSource: RecordingPolicy.source)
         renderers.register(UnlockRenderer(feature: unlock), forSource: UnlockPolicy.source)
-        agents.onAttentionChange = { [weak self] needed in
-            self?.notchSystem.setAttention(needed)
-        }
+        agents.onAttentionChange = { [weak self] needed in self?.notchSystem.setAttention(needed) }
     }
 }

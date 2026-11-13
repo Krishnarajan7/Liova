@@ -1,17 +1,17 @@
 import { motion } from "motion/react";
 import type { ReactNode } from "react";
-import { Calendar, Eye, Flame, Glass, Rain, Speaker, Timer, Tray } from "../components/Icons";
+import { Calendar, Clipboard, Eye, Flame, Keys, Rain, Speaker, Tray } from "../components/Icons";
 import { Note, Reveal, SectionHeader } from "../components/ui";
 
 const items: { icon: ReactNode; title: [string, string]; note: string }[] = [
   { icon: <Tray size={44} />, title: ["File Shelf", "and AirDrop"], note: "Drop files on the notch, drag them out anywhere." },
   { icon: <Speaker size={44} />, title: ["Volume and", "brightness HUDs"], note: "Slim bars at the screen's edge, or in the notch." },
-  { icon: <Timer size={44} />, title: ["Timers you", "can see"], note: "Start one in a tap, watch it count down." },
+  { icon: <Clipboard size={44} />, title: ["Clipboard", "history"], note: "Your last 30 copies, a click away. Never passwords." },
   { icon: <Calendar size={44} />, title: ["Your next", "meeting"], note: "Ten minutes early, with a Join button." },
   { icon: <Rain size={44} />, title: ["Rain,", "before it starts"], note: "Opt-in weather. Watch it fall in the notch." },
   { icon: <Eye size={44} />, title: ["Camera and", "mic alerts"], note: "Lights up the moment any app turns them on." },
   { icon: <Flame size={44} />, title: ["What's heating", "your Mac"], note: "Names the app eating CPU or memory, and quits it." },
-  { icon: <Glass size={44} />, title: ["Black", "or glass"], note: "Liquid Glass on macOS 26, or classic black." },
+  { icon: <Keys size={44} />, title: ["Shortcuts", "from anywhere"], note: "⌃⌥N opens the notch, ⌃⌥V your clipboard." },
 ];
 
 export function More() {

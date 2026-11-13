@@ -312,7 +312,7 @@ function DownloadOpen({ compact }: { compact: boolean }) {
       <div className="w-full">
         <div className="flex items-center gap-2">
           <Download size={14} className="text-sky" />
-          <p className="flex-1 truncate text-[15px] font-semibold">Liova-1.1.0.dmg</p>
+          <p className="flex-1 truncate text-[15px] font-semibold">Liova-1.3.0.dmg</p>
           <p className="numeric text-[12px] text-white/50">24.6 MB/s</p>
         </div>
         <div className="mt-3 h-[6px] overflow-hidden rounded-full bg-white/15">

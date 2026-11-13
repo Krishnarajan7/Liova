@@ -9,8 +9,6 @@ import Foundation
 public enum PreviewFeature: String, CaseIterable, Sendable {
     /// Mute and hang up calls from the notch.
     case calls
-    /// Global keyboard shortcuts for the notch.
-    case hotkeys
     /// Start, pause and stop screen recordings (OBS, macOS) from the notch.
     case recording
     /// A short moment in the notch when the Mac is unlocked.

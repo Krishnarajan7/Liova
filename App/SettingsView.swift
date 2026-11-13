@@ -120,9 +120,7 @@ private struct GeneralSettings: View {
                 .disabled(!settings.openOnHover)
                 Toggle("Haptic feedback on trackpads", isOn: $settings.hapticsEnabled)
             }
-            if PreviewFeature.hotkeys.isEnabled() {
-                ShortcutSection(settings: settings, hotkeys: hotkeys)
-            }
+            ShortcutSection(settings: settings, hotkeys: hotkeys)
         }
         .formStyle(.grouped)
     }
