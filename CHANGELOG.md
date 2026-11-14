@@ -10,8 +10,15 @@ released, its section becomes the GitHub release notes.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-14
+
 ### Added
 
+- **Calls in the notch.** While you're on a call (WhatsApp, Zoom, FaceTime, Teams, Slack,
+  Discord, Google Meet in your browser and more), the notch shows the app and how long the
+  call has run, with **Mute** and **Hang Up** right there. Mute works in every app and is
+  undone when the call ends. Hang Up presses the app's own button, so it needs Accessibility
+  access. Turn it off in Settings → General.
 - The heat alert finds what's warming your Mac when no single app is to blame: several apps
   adding up ("Your Mac is working hard", each one with its share and a Quit button), and
   macOS's own background work, like Photos analyzing your library or Spotlight indexing.

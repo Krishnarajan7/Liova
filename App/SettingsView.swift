@@ -190,16 +190,14 @@ private struct ActivitySettings: View {
                         + "macOS asks for Bluetooth access the first time."
                 )
             }
-            if PreviewFeature.calls.isEnabled() {
-                Section {
-                    Toggle("Calls: mute and hang up from the notch", isOn: $settings.callControlsEnabled)
-                } footer: {
-                    Text(
-                        "While an app records from the microphone, the notch shows the call, how long it's run "
-                            + "and whether you're muted. Mute works in every app; Hang Up presses the app's own "
-                            + "Leave button, which needs Accessibility access."
-                    )
-                }
+            Section {
+                Toggle("Calls: mute and hang up from the notch", isOn: $settings.callControlsEnabled)
+            } footer: {
+                Text(
+                    "While an app records from the microphone, the notch shows the call, how long it's run "
+                        + "and whether you're muted. Mute works in every app; Hang Up presses the app's own "
+                        + "Leave button, which needs Accessibility access."
+                )
             }
             Section {
                 Toggle("Clipboard history", isOn: $settings.clipboardHistoryEnabled)

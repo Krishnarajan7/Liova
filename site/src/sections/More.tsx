@@ -1,6 +1,6 @@
 import { motion } from "motion/react";
 import type { ReactNode } from "react";
-import { Calendar, Clipboard, Eye, Flame, Keys, Rain, Speaker, Tray } from "../components/Icons";
+import { Calendar, Clipboard, Flame, Keys, Phone, Rain, Speaker, Tray } from "../components/Icons";
 import { Note, Reveal, SectionHeader } from "../components/ui";
 
 const items: { icon: ReactNode; title: [string, string]; note: string }[] = [
@@ -9,7 +9,7 @@ const items: { icon: ReactNode; title: [string, string]; note: string }[] = [
   { icon: <Clipboard size={44} />, title: ["Clipboard", "history"], note: "Your last 30 copies, a click away. Never passwords." },
   { icon: <Calendar size={44} />, title: ["Your next", "meeting"], note: "Ten minutes early, with a Join button." },
   { icon: <Rain size={44} />, title: ["Rain,", "before it starts"], note: "Opt-in weather. Watch it fall in the notch." },
-  { icon: <Eye size={44} />, title: ["Camera and", "mic alerts"], note: "Lights up the moment any app turns them on." },
+  { icon: <Phone size={44} />, title: ["Calls,", "from the notch"], note: "Mute or hang up WhatsApp, Zoom or Meet in one click." },
   { icon: <Flame size={44} />, title: ["What's heating", "your Mac"], note: "Names the app eating CPU or memory, and quits it." },
   { icon: <Keys size={44} />, title: ["Shortcuts", "from anywhere"], note: "⌃⌥N opens the notch, ⌃⌥V your clipboard." },
 ];

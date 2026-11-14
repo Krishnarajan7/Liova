@@ -78,8 +78,7 @@ struct CallTests {
     init() {
         settings = LiovaSettings(defaults: scratch.defaults)
         feature = CallFeature(
-            engine: engine, settings: settings, users: users, mute: mute, hangUpper: hangUpper,
-            isAvailable: { true }
+            engine: engine, settings: settings, users: users, mute: mute, hangUpper: hangUpper
         )
         feature.syncWithSettings()
     }
@@ -152,15 +151,6 @@ struct CallTests {
         #expect(feature.call == nil)
         #expect(activity == nil)
         #expect(!users.isStarted)
-    }
-
-    @Test func hiddenUntilReleased() {
-        let hidden = CallFeature(
-            engine: engine, settings: settings, users: FakeMicUsers(), mute: FakeMute(), hangUpper: FakeHangUp(),
-            isAvailable: { false }
-        )
-        hidden.syncWithSettings()
-        #expect(hidden.call == nil)
     }
 }
 

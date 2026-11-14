@@ -29,7 +29,6 @@ public final class CallFeature {
     @ObservationIgnored private let users: any MicrophoneUserMonitoring
     @ObservationIgnored private let mute: any InputMuting
     @ObservationIgnored private let hangUpper: any CallHangingUp
-    @ObservationIgnored private let isAvailable: @MainActor () -> Bool
     @ObservationIgnored private let now: @Sendable () -> Date
     @ObservationIgnored private var isRunning = false
     /// Liova muted the mic for this call, so it unmutes when the call ends.
@@ -42,7 +41,6 @@ public final class CallFeature {
         users: any MicrophoneUserMonitoring = SystemMicrophoneUserMonitor(),
         mute: any InputMuting = SystemInputMute(),
         hangUpper: any CallHangingUp = AccessibilityHangUp(),
-        isAvailable: @escaping @MainActor () -> Bool = { PreviewFeature.calls.isEnabled() },
         now: @escaping @Sendable () -> Date = Date.init
     ) {
         self.engine = engine
@@ -50,12 +48,11 @@ public final class CallFeature {
         self.users = users
         self.mute = mute
         self.hangUpper = hangUpper
-        self.isAvailable = isAvailable
         self.now = now
     }
 
     public func syncWithSettings() {
-        guard settings.callControlsEnabled, isAvailable() else {
+        guard settings.callControlsEnabled else {
             stop()
             return
         }

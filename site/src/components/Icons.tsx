@@ -143,6 +143,12 @@ export const Lock = (p: IconProps) => (
     <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="currentColor" strokeWidth="2" />
   </Icon>
 );
+export const Phone = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M6.6 3.5h2.6l1.6 4.2-2.1 1.5a11.5 11.5 0 0 0 6.1 6.1l1.5-2.1 4.2 1.6v2.6a2.2 2.2 0 0 1-2.3 2.2A16.7 16.7 0 0 1 4.4 5.8 2.2 2.2 0 0 1 6.6 3.5Z" />
+  </Icon>
+);
+
 export const Eye = (p: IconProps) => (
   <Icon {...p}>
     <path
