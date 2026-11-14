@@ -10,6 +10,18 @@ released, its section becomes the GitHub release notes.
 
 ## [Unreleased]
 
+### Added
+
+- The heat alert finds what's warming your Mac when no single app is to blame: several apps
+  adding up ("Your Mac is working hard", each one with its share and a Quit button), and
+  macOS's own background work, like Photos analyzing your library or Spotlight indexing.
+- The iOS Simulator counts as one app, with its devices and their apps, instead of five small
+  processes.
+- The heat alert speaks up sooner on a fanless Mac: apps adding up to one core are enough, an
+  app hovering around the line keeps counting through small dips, and a Mac that's only warm
+  (not yet hot) is listened to.
+- Plugged in, a busy app is "warming your Mac"; on battery, it's "draining battery".
+
 ## [1.3.0] - 2026-11-13
 
 ### Added

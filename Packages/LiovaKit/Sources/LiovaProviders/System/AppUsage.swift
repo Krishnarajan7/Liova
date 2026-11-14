@@ -15,14 +15,25 @@ public struct AppUsage: Identifiable, Equatable, Sendable {
     public var cpu: Double
     /// Physical memory footprint, in bytes.
     public var memory: UInt64
+    /// Set for macOS's own background work (Photos analyzing the library), which can't be quit.
+    public var work: SystemWork?
 
-    public init(id: String, name: String, bundlePath: String?, pids: [pid_t], cpu: Double, memory: UInt64) {
+    public init(
+        id: String, name: String, bundlePath: String?, pids: [pid_t], cpu: Double, memory: UInt64,
+        work: SystemWork? = nil
+    ) {
         self.id = id
         self.name = name
         self.bundlePath = bundlePath
         self.pids = pids
         self.cpu = cpu
         self.memory = memory
+        self.work = work
+    }
+
+    /// macOS's own work isn't the user's to quit.
+    public var canQuit: Bool {
+        work == nil
     }
 }
 
@@ -35,13 +46,17 @@ public struct ProcessReading: Equatable, Sendable {
     public var name: String?
     public var cpu: Double
     public var memory: UInt64
+    public var work: SystemWork?
 
-    public init(pid: pid_t, path: String, name: String? = nil, cpu: Double, memory: UInt64) {
+    public init(
+        pid: pid_t, path: String, name: String? = nil, cpu: Double, memory: UInt64, work: SystemWork? = nil
+    ) {
         self.pid = pid
         self.path = path
         self.name = name
         self.cpu = cpu
         self.memory = memory
+        self.work = work
     }
 }
 
@@ -49,8 +64,9 @@ public struct ProcessReading: Equatable, Sendable {
 /// groups them into apps.
 ///
 /// CPU is a difference between two readings, so the first `sample()` reports 0 for every
-/// app. macOS's own processes are left out, unless an app started them (Safari's web pages):
-/// the user can't do anything about the rest. A pass over every process takes about a
+/// app. macOS's own processes are left out, unless an app started them (Safari's web pages)
+/// or they're background work worth naming (`SystemWork`): the user can't do anything about
+/// the rest. A pass over every process takes about a
 /// millisecond; callers decide how often.
 public final class AppUsageReader: @unchecked Sendable {
     /// Guarded by being used from one place at a time (the sampler's task).
@@ -88,9 +104,10 @@ public final class AppUsageReader: @unchecked Sendable {
             // Fails for other users' processes (root's daemons): nothing to do about those.
             guard result == 0 else { continue }
             let start = info.ri_proc_start_abstime
-            guard let path = path(for: pid, start: start),
-                  let owner = Self.owner(of: path, responsiblePath: responsiblePath(for: pid, path: path))
-            else { continue }
+            guard let path = path(for: pid, start: start) else { continue }
+            let owner = Self.owner(of: path, responsiblePath: responsiblePath(for: pid, path: path))
+            let work = owner == nil ? Self.work(at: path) : nil
+            guard let owner = owner ?? work.map({ "system:\($0.id)" }) else { continue }
             // Mach time units on Apple Silicon, nanoseconds on Intel (timebase 1/1).
             let cpuTime = (info.ri_user_time + info.ri_system_time) * timebase.numer / timebase.denom
             current[pid] = (start, cpuTime)
@@ -98,9 +115,9 @@ public final class AppUsageReader: @unchecked Sendable {
             if elapsed > 0, let old = previous[pid], old.start == start, cpuTime >= old.cpuTime {
                 cpu = Double(cpuTime - old.cpuTime) / elapsed
             }
-            let name = Self.appBundle(for: owner) == nil ? Self.processName(pid) : nil
+            let name = Self.appBundle(for: owner) == nil && work == nil ? Self.processName(pid) : nil
             readings.append(ProcessReading(
-                pid: pid, path: owner, name: name, cpu: cpu, memory: info.ri_phys_footprint
+                pid: pid, path: owner, name: name, cpu: cpu, memory: info.ri_phys_footprint, work: work
             ))
         }
         previous = current
@@ -167,8 +184,19 @@ public final class AppUsageReader: @unchecked Sendable {
         return ["/System/", "/usr/", "/bin/", "/sbin/", "/Library/Apple/"].contains { path.hasPrefix($0) }
     }
 
-    /// The outermost `.app` in `path`: a helper inside Chrome.app belongs to Chrome.
+    /// macOS background work worth naming, for a process of macOS's own.
+    static func work(at path: String) -> SystemWork? {
+        isSystemPath(path) ? SystemWork.of(process: (path as NSString).lastPathComponent) : nil
+    }
+
+    /// The outermost `.app` in `path`: a helper inside Chrome.app belongs to Chrome. Xcode's
+    /// own apps (Simulator, Instruments) are apps of their own, not Xcode's helpers.
     static func appBundle(for path: String) -> String? {
+        if let developer = path.range(of: ".app/Contents/Developer/Applications/"),
+           let app = path[developer.upperBound...].range(of: ".app")
+        {
+            return String(path[..<app.upperBound])
+        }
         if let range = path.range(of: ".app/") {
             return String(path[..<range.lowerBound]) + ".app"
         }
@@ -178,7 +206,12 @@ public final class AppUsageReader: @unchecked Sendable {
     /// What a process counts toward, as a path: its app, the app that started it, or the
     /// process itself when it's the user's own tool. Nil for parts of macOS (the Dock, Finder,
     /// daemons), which aren't the user's to quit.
-    static func owner(of path: String, responsiblePath: String?) -> String? {
+    static func owner(of path: String, responsiblePath: String?, simulator: String = simulatorPath) -> String? {
+        // The Simulator's devices, their apps and its rendering all count as the Simulator:
+        // apart, each looks small, together they're often what heats the Mac.
+        if path.contains("/CoreSimulator") {
+            return simulator
+        }
         if let bundle = appBundle(for: path) {
             return isCoreService(bundle) ? nil : bundle
         }
@@ -189,6 +222,10 @@ public final class AppUsageReader: @unchecked Sendable {
         }
         return path
     }
+
+    /// Where Simulator.app is; looked up once.
+    static let simulatorPath = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.iphonesimulator")?
+        .path ?? "/Applications/Xcode.app/Contents/Developer/Applications/Simulator.app"
 
     /// Apps that are part of macOS itself, like Finder and the Dock. Music and Safari live under
     /// /System too, but they're the user's apps.
@@ -201,14 +238,15 @@ public final class AppUsageReader: @unchecked Sendable {
         var apps: [String: AppUsage] = [:]
         for process in processes {
             let bundle = appBundle(for: process.path)
-            let id = bundle ?? "pid:\(process.pid)"
+            let id = bundle ?? (process.work == nil ? "pid:\(process.pid)" : process.path)
             var app = apps[id] ?? AppUsage(
                 id: id,
-                name: process.name ?? name(bundle: bundle, path: process.path),
+                name: process.work?.name ?? process.name ?? name(bundle: bundle, path: process.path),
                 bundlePath: bundle,
                 pids: [],
                 cpu: 0,
-                memory: 0
+                memory: 0,
+                work: process.work
             )
             app.pids.append(process.pid)
             app.cpu += process.cpu

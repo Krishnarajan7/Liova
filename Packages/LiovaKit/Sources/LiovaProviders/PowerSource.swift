@@ -112,7 +112,7 @@ public final class IOKitPowerSource: PowerSourceProviding {
     }
 
     /// Reads the internal battery, if there is one.
-    static func read() -> PowerSnapshot {
+    nonisolated static func read() -> PowerSnapshot {
         let lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
         guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
               let list = IOPSCopyPowerSourcesList(info)?.takeRetainedValue() as? [CFTypeRef]
@@ -130,7 +130,7 @@ public final class IOKitPowerSource: PowerSourceProviding {
     }
 
     /// Converts an IOKit power-source description. Separate from IOKit for testing.
-    static func parse(_ description: [String: Any], lowPower: Bool) -> PowerSnapshot {
+    nonisolated static func parse(_ description: [String: Any], lowPower: Bool) -> PowerSnapshot {
         let current = description[kIOPSCurrentCapacityKey] as? Int ?? 0
         let maximum = max(description[kIOPSMaxCapacityKey] as? Int ?? 100, 1)
         let percentage = Int((Double(current) / Double(maximum) * 100).rounded())
@@ -150,9 +150,17 @@ public final class IOKitPowerSource: PowerSourceProviding {
         )
     }
 
-    private static func withLowPower(_ snapshot: PowerSnapshot, _ lowPower: Bool) -> PowerSnapshot {
+    nonisolated static func withLowPower(_ snapshot: PowerSnapshot, _ lowPower: Bool) -> PowerSnapshot {
         var copy = snapshot
         copy.isLowPowerMode = lowPower
         return copy
+    }
+}
+
+public extension PowerSnapshot {
+    /// Running on the battery right now: what a busy app costs is then battery life.
+    static func isOnBattery() -> Bool {
+        let power = IOKitPowerSource.read()
+        return power.hasBattery && !power.isPluggedIn
     }
 }

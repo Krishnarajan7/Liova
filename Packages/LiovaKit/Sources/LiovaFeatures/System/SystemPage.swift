@@ -268,8 +268,17 @@ private struct AppRow: View {
                 .monospacedDigit()
                 .foregroundStyle(.white.opacity(ranking == .memory ? 0.9 : 0.5))
                 .frame(width: 50, alignment: .trailing)
-            QuitButton(state: state, quit: quit, forceQuit: forceQuit)
-                .frame(width: 62, alignment: .trailing)
+            Group {
+                if app.canQuit {
+                    QuitButton(state: state, quit: quit, forceQuit: forceQuit)
+                } else {
+                    Text("macOS")
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.4))
+                        .help("Part of macOS. It stops on its own when it's done.")
+                }
+            }
+            .frame(width: 62, alignment: .trailing)
         }
         .accessibilityElement(children: .combine)
     }
@@ -332,6 +341,9 @@ enum AppUsageText {
 
     /// What the numbers mean for the user, when they matter.
     static func hint(for app: AppUsage, totalMemory: UInt64) -> String? {
+        if let work = app.work {
+            return work.activity
+        }
         if app.cpu >= heavyCPU {
             return "Heating up your Mac"
         }
@@ -342,6 +354,17 @@ enum AppUsageText {
     }
 
     @MainActor static func icon(for app: AppUsage) -> NSImage {
+        if let work = app.work {
+            if let id = work.appBundleID, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) {
+                return NSWorkspace.shared.icon(forFile: url.path)
+            }
+            let white = NSImage.SymbolConfiguration(paletteColors: [.white])
+            if let symbol = NSImage(systemSymbolName: work.symbol, accessibilityDescription: work.name)?
+                .withSymbolConfiguration(white)
+            {
+                return symbol
+            }
+        }
         if let bundlePath = app.bundlePath {
             return NSWorkspace.shared.icon(forFile: bundlePath)
         }

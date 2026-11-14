@@ -74,7 +74,23 @@ struct ResourceAlertTests {
     @Test func aHotMacSpeaksUpSooner() throws {
         minute([app("Spotify", cpu: 0.6)], hot: true)
         let alert = try #require(feature.alert)
-        #expect(alert.detail == "60% CPU · your Mac is running hot")
+        #expect(alert.detail == "60% CPU · your Mac is getting warm")
+    }
+
+    @Test func anAppHoveringAroundTheLineKeepsItsStreak() throws {
+        minute([app("Simulator", cpu: 0.82)])
+        minute([app("Simulator", cpu: 0.7)])
+        minute([app("Simulator", cpu: 0.79)])
+        #expect(try #require(feature.alert).app.name == "Simulator")
+    }
+
+    @Test func aCoreOfAppsTogetherIsEnough() throws {
+        for _ in 0 ..< 3 {
+            minute([app("Simulator", cpu: 0.6), app("Terminal", cpu: 0.25), app("Chrome", cpu: 0.2)])
+        }
+        let alert = try #require(feature.alert)
+        #expect(alert.title == "Your Mac is working hard")
+        #expect(alert.crowd.map(\.name) == ["Simulator", "Terminal", "Chrome"])
     }
 
     @Test func theAlertEndsWhenTheAppCalmsDown() {
@@ -142,6 +158,72 @@ struct ResourceAlertTests {
         feature.syncWithSettings()
         #expect(feature.alert == nil)
         #expect(engine.activity(ResourceAlertPolicy.alertID) == nil)
+    }
+
+    @Test func severalAppsAddingUpAreNamedTogether() throws {
+        let photos = AppUsage(
+            id: "system:photos", name: "Photos", bundlePath: nil, pids: [7], cpu: 0.46, memory: 0,
+            work: SystemWork.of(process: "mediaanalysisd")
+        )
+        for _ in 0 ..< 3 {
+            minute([app("Simulator", cpu: 0.75), photos, app("Chrome", cpu: 0.4), app("Notes", cpu: 0.05)])
+        }
+        let alert = try #require(feature.alert)
+        #expect(alert.title == "Your Mac is working hard")
+        #expect(alert.detail == "Simulator 75% · Photos 46% · Chrome 40%")
+        #expect(alert.reading == "161%")
+        // macOS's own work can't be quit; the apps can.
+        feature.quit(photos)
+        feature.quit(alert.crowd[0])
+        #expect(recorder.quit == ["Simulator"])
+        // Calm again: it ends.
+        minute([app("Simulator", cpu: 0.1)])
+        #expect(feature.alert == nil)
+    }
+
+    @Test func oneHeavyAppIsNamedBeforeTheCrowd() throws {
+        for _ in 0 ..< 3 {
+            minute([app("Spotify", cpu: 1.2), app("Chrome", cpu: 0.5)])
+        }
+        #expect(try #require(feature.alert).title == "Spotify is heating up your Mac")
+    }
+
+    @Test func ignoringTheCrowdKeepsSingleAppsAlerting() {
+        for _ in 0 ..< 3 {
+            minute([app("Simulator", cpu: 0.75), app("Chrome", cpu: 0.75)])
+        }
+        feature.ignore()
+        for _ in 0 ..< 3 {
+            minute([app("Simulator", cpu: 0.75), app("Chrome", cpu: 0.75)])
+        }
+        #expect(feature.alert == nil)
+        for _ in 0 ..< 3 {
+            minute([app("Xcode", cpu: 2)])
+        }
+        #expect(feature.alert?.app.name == "Xcode")
+    }
+
+    @Test func backgroundWorkSaysItStopsOnItsOwn() throws {
+        let spotlight = AppUsage(
+            id: "system:spotlight", name: "Spotlight", bundlePath: nil, pids: [8], cpu: 1.1, memory: 0,
+            work: SystemWork.of(process: "mdworker_shared")
+        )
+        for _ in 0 ..< 3 {
+            minute([spotlight])
+        }
+        let alert = try #require(feature.alert)
+        #expect(alert.title == "Spotlight is indexing your files")
+        #expect(alert.detail == "110% CPU for 3 min · it stops when it's done")
+        feature.quit()
+        #expect(recorder.quit.isEmpty)
+    }
+
+    @Test func pluggedInItWarmsInsteadOfDraining() throws {
+        for _ in 0 ..< 3 {
+            feature.receive([app("Spotify", cpu: 1.45)], memoryUsed: 0.5, hot: false, onBattery: false)
+            clock.advance(60)
+        }
+        #expect(try #require(feature.alert).detail == "145% CPU for 3 min, warming your Mac")
     }
 }
 

@@ -31,6 +31,54 @@ struct AppUsageTests {
         #expect(AppUsageReader.owner(of: webContent, responsiblePath: dock) == nil)
     }
 
+    @Test func theSimulatorCountsAsOneApp() {
+        let simulator = "/Applications/Xcode.app/Contents/Developer/Applications/Simulator.app"
+        let parts = [
+            "/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/Resources/"
+                + "SimRenderingServices.simdeviceio/Contents/XPCServices/SimMetalHost.xpc/Contents/MacOS/SimMetalHost",
+            "/Library/Developer/CoreSimulator/Volumes/iOS_23F77/Library/Developer/CoreSimulator/Profiles/Runtimes/"
+                + "iOS 26.5.simruntime/Contents/Resources/RuntimeRoot/usr/libexec/backboardd",
+            "/Users/me/Library/Developer/CoreSimulator/Devices/178F/data/Containers/Bundle/Application/109E/"
+                + "Runner.app/Runner",
+        ]
+        for path in parts {
+            #expect(AppUsageReader.owner(of: path, responsiblePath: nil, simulator: simulator) == simulator)
+        }
+        // Simulator.app itself, inside Xcode, is its own app, not Xcode.
+        #expect(AppUsageReader.appBundle(for: simulator + "/Contents/MacOS/Simulator") == simulator)
+        #expect(AppUsageReader.appBundle(for: "/Applications/Xcode.app/Contents/MacOS/Xcode")
+            == "/Applications/Xcode.app")
+    }
+
+    @Test func macOSBackgroundWorkIsNamed() {
+        let analysis = "/System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd"
+        #expect(AppUsageReader.work(at: analysis)?.name == "Photos")
+        #expect(AppUsageReader.work(at: "/usr/libexec/coreaudiod") == nil)
+        // Only macOS's own: a tool of the user's with the same name stays itself.
+        #expect(AppUsageReader.work(at: "/Users/me/bin/cloudd") == nil)
+
+        let apps = AppUsageReader.group([
+            ProcessReading(
+                pid: 1,
+                path: "system:photos",
+                cpu: 0.3,
+                memory: 10,
+                work: SystemWork.of(process: "mediaanalysisd")
+            ),
+            ProcessReading(
+                pid: 2,
+                path: "system:photos",
+                cpu: 0.2,
+                memory: 10,
+                work: SystemWork.of(process: "photoanalysisd")
+            ),
+        ])
+        #expect(apps.count == 1)
+        #expect(apps[0].name == "Photos")
+        #expect(apps[0].id == "system:photos")
+        #expect(!apps[0].canQuit)
+    }
+
     @Test func groupsAddUpAndBusiestComesFirst() {
         let apps = AppUsageReader.group([
             ProcessReading(pid: 1, path: "/Applications/Chrome.app", cpu: 0.2, memory: 100),
