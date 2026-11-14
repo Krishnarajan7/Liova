@@ -7,6 +7,7 @@ struct CallButtonLabelTests {
         #expect(CallButtonLabels.isHangUp("Leave call"))
         #expect(CallButtonLabels.isHangUp("End Call"))
         #expect(CallButtonLabels.isHangUp("Hang Up…"))
+        #expect(CallButtonLabels.isHangUp("\u{200E}End call"))
         #expect(!CallButtonLabels.isHangUp("Send"))
         #expect(!CallButtonLabels.isHangUp("Calendar"))
     }

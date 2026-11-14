@@ -40,7 +40,7 @@ public final class AccessibilityHangUp: CallHangingUp {
         // Chromium browsers and Electron apps only build their web content's tree on request.
         AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue)
 
-        if let button = Self.findButton(in: app, matching: CallButtonLabels.isHangUp) {
+        if let button = await Self.findHangUp(in: app) {
             AXUIElementPerformAction(button, kAXPressAction as CFString)
             // "Leave meeting?" comes up a moment later in some apps.
             try? await Task.sleep(for: .milliseconds(450))
@@ -60,6 +60,21 @@ public final class AccessibilityHangUp: CallHangingUp {
         return .notFound
     }
 
+    /// The tree a browser builds on request isn't there at once (Meet's Leave call button
+    /// shows up a moment later), so it's looked for a few times. Then the menu bar: WhatsApp's
+    /// Call menu has End Call.
+    private static func findHangUp(in app: AXUIElement) async -> AXUIElement? {
+        for attempt in 0 ..< 4 {
+            if attempt > 0 {
+                try? await Task.sleep(for: .milliseconds(400))
+            }
+            if let button = findButton(in: app, matching: CallButtonLabels.isHangUp) {
+                return button
+            }
+        }
+        return findButton(in: app, from: kAXMenuBarAttribute, matching: CallButtonLabels.isHangUp)
+    }
+
     public static func askForPermission() {
         let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
@@ -69,10 +84,28 @@ public final class AccessibilityHangUp: CallHangingUp {
 
     /// Breadth-first through the app's windows, so the toolbar's button is found before
     /// anything buried in a chat. Bounded, so a huge web page can't stall the main thread.
-    private static func findButton(in app: AXUIElement, matching matches: (String) -> Bool) -> AXUIElement? {
-        var queue = children(of: app, attribute: kAXWindowsAttribute)
+    private static func findButton(
+        in app: AXUIElement,
+        from root: String = kAXWindowsAttribute,
+        matching matches: (String) -> Bool
+    ) -> AXUIElement? {
+        var value: CFTypeRef?
+        var queue = children(of: app, attribute: root)
+        if queue.isEmpty, AXUIElementCopyAttributeValue(app, root as CFString, &value) == .success,
+           let value, CFGetTypeID(value) == AXUIElementGetTypeID()
+        {
+            // The menu bar is one element, not a list.
+            queue = [unsafeDowncast(value, to: AXUIElement.self)]
+        }
+        // The front window first: a browser's other windows can hold thousands of elements.
+        var front: CFTypeRef?
+        if AXUIElementCopyAttributeValue(app, kAXMainWindowAttribute as CFString, &front) == .success,
+           let front, let index = queue.firstIndex(where: { CFEqual($0, front) })
+        {
+            queue.insert(queue.remove(at: index), at: 0)
+        }
         var index = 0
-        let limit = 6000
+        let limit = 15000
         while index < queue.count, index < limit {
             let element = queue[index]
             index += 1
@@ -86,11 +119,16 @@ public final class AccessibilityHangUp: CallHangingUp {
 
     private static func isPressable(_ element: AXUIElement) -> Bool {
         guard let role = string(element, kAXRoleAttribute) else { return false }
+        if role == kAXMenuItemRole {
+            var enabled: CFTypeRef?
+            AXUIElementCopyAttributeValue(element, kAXEnabledAttribute as CFString, &enabled)
+            return (enabled as? Bool) ?? false
+        }
         return role == kAXButtonRole || role == "AXLink" || role == kAXMenuButtonRole
     }
 
     private static func labels(of element: AXUIElement) -> [String] {
-        [kAXTitleAttribute, kAXDescriptionAttribute].compactMap { string(element, $0) }
+        [kAXTitleAttribute, kAXDescriptionAttribute, kAXHelpAttribute].compactMap { string(element, $0) }
     }
 
     private static func string(_ element: AXUIElement, _ attribute: String) -> String? {
@@ -127,8 +165,11 @@ public enum CallButtonLabels {
         "end", "end call", "hang up", "disconnect", "end video call", "end audio call",
     ]
 
+    /// WhatsApp starts every label with an invisible left-to-right mark ("\u{200E}End call"),
+    /// so text-direction marks are dropped before comparing.
     static func normalized(_ label: String) -> String {
-        label.lowercased()
+        String(label.unicodeScalars.filter { $0.properties.generalCategory != .format })
+            .lowercased()
             .replacingOccurrences(of: "…", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
     }

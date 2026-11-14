@@ -88,17 +88,29 @@ public protocol MicrophoneUserMonitoring: AnyObject {
 }
 
 /// Tells when apps start or stop recording, from Core Audio's process objects: the list
-/// of processes doing audio, and whether each is recording. Listeners only, never a timer;
-/// bursts (a call app opening several streams) settle into one update.
+/// of processes doing audio, and whether each is recording. Bursts (a call app opening
+/// several streams) settle into one update.
+///
+/// A process's "recording" flag can lag seconds behind the microphone itself (WhatsApp's
+/// does, both ways), so the default input's "running somewhere" is listened to as well, and
+/// each change is followed by a second-by-second look for a few seconds, and for as long
+/// as anyone records: a call shows when it's answered and ends when it's hung up. Nothing
+/// runs while nobody records.
 @MainActor
 public final class SystemMicrophoneUserMonitor: MicrophoneUserMonitoring {
     private var onChange: (@MainActor ([MicrophoneUser]) -> Void)?
     private var listListener: AudioObjectPropertyListenerBlock?
     private var inputListeners: [AudioObjectID: AudioObjectPropertyListenerBlock] = [:]
+    private var deviceListener: AudioObjectPropertyListenerBlock?
+    private var runningListener: (device: AudioObjectID, block: AudioObjectPropertyListenerBlock)?
     private var pending: Task<Void, Never>?
+    private var followUp: Task<Void, Never>?
+    private var followUntil = ContinuousClock.now
     private var last: [MicrophoneUser]?
 
     static let settle: Duration = .milliseconds(200)
+    static let followInterval: Duration = .seconds(1)
+    static let followFor: Duration = .seconds(6)
 
     public init() {}
 
@@ -113,6 +125,12 @@ public final class SystemMicrophoneUserMonitor: MicrophoneUserMonitoring {
             noErr
         {
             listListener = block
+        }
+        var deviceAddress = CoreAudioAddress.global(kAudioHardwarePropertyDefaultInputDevice)
+        if AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &deviceAddress, .main, block) ==
+            noErr
+        {
+            deviceListener = block
         }
         syncProcesses()
         report()
@@ -131,21 +149,52 @@ public final class SystemMicrophoneUserMonitor: MicrophoneUserMonitoring {
             )
         }
         listListener = nil
+        if let deviceListener {
+            var address = CoreAudioAddress.global(kAudioHardwarePropertyDefaultInputDevice)
+            AudioObjectRemovePropertyListenerBlock(
+                AudioObjectID(kAudioObjectSystemObject),
+                &address,
+                .main,
+                deviceListener
+            )
+        }
+        deviceListener = nil
+        removeRunningListener()
         for object in Array(inputListeners.keys) {
             removeInputListener(object)
         }
+        followUp?.cancel()
+        followUp = nil
         onChange = nil
         last = nil
     }
 
     private func schedule() {
-        guard onChange != nil, pending == nil else { return }
+        guard onChange != nil else { return }
+        followUntil = .now + Self.followFor
+        guard pending == nil else { return }
         pending = Task { [weak self] in
             try? await Task.sleep(for: Self.settle)
             guard !Task.isCancelled, let self else { return }
             pending = nil
             syncProcesses()
             report()
+            follow()
+        }
+    }
+
+    /// Looks again every second, for a few seconds after a change and while anyone records.
+    private func follow() {
+        guard followUp == nil else { return }
+        followUp = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.followInterval)
+                guard !Task.isCancelled, let self else { return }
+                syncProcesses()
+                report()
+                guard ContinuousClock.now < followUntil || last?.isEmpty == false else { break }
+            }
+            self?.followUp = nil
         }
     }
 
@@ -157,6 +206,7 @@ public final class SystemMicrophoneUserMonitor: MicrophoneUserMonitoring {
     }
 
     private func syncProcesses() {
+        syncRunningListener()
         let objects = Set(MicrophoneUsers.processObjects())
         for object in inputListeners.keys where !objects.contains(object) {
             removeInputListener(object)
@@ -170,6 +220,28 @@ public final class SystemMicrophoneUserMonitor: MicrophoneUserMonitoring {
                 inputListeners[object] = block
             }
         }
+    }
+
+    /// The default input's "running somewhere": on the moment any app opens the microphone.
+    private func syncRunningListener() {
+        let device = SystemInputMute.defaultInput()
+        guard device != runningListener?.device else { return }
+        removeRunningListener()
+        guard device != 0 else { return }
+        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            MainActor.assumeIsolated { self?.schedule() }
+        }
+        var address = CoreAudioAddress.global(kAudioDevicePropertyDeviceIsRunningSomewhere)
+        if AudioObjectAddPropertyListenerBlock(device, &address, .main, block) == noErr {
+            runningListener = (device, block)
+        }
+    }
+
+    private func removeRunningListener() {
+        guard let (device, block) = runningListener else { return }
+        var address = CoreAudioAddress.global(kAudioDevicePropertyDeviceIsRunningSomewhere)
+        AudioObjectRemovePropertyListenerBlock(device, &address, .main, block)
+        runningListener = nil
     }
 
     private func removeInputListener(_ object: AudioObjectID) {
@@ -305,7 +377,7 @@ public final class SystemInputMute: InputMuting {
         mElement: kAudioObjectPropertyElementMain
     )
 
-    private static func defaultInput() -> AudioObjectID {
+    static func defaultInput() -> AudioObjectID {
         var address = CoreAudioAddress.global(kAudioHardwarePropertyDefaultInputDevice)
         var device = AudioObjectID(0)
         var size = UInt32(MemoryLayout<AudioObjectID>.size)
