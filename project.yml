@@ -15,7 +15,7 @@ packages:
 
 settings:
   base:
-    MARKETING_VERSION: 1.4.0
+    MARKETING_VERSION: 1.5.0
     CURRENT_PROJECT_VERSION: 1
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
@@ -101,7 +101,7 @@ targets:
         NSBluetoothAlwaysUsageDescription: Liova shows your AirPods and other headphones when they connect, with their battery, and lets you switch noise control. It only reads connected audio devices.
         NSLocationUsageDescription: Liova shows the weather where you are. It asks for your approximate location only while Weather is on, and rounds it to about a kilometre before asking Open-Meteo.
         NSLocationWhenInUseUsageDescription: Liova shows the weather where you are. It asks for your approximate location only while Weather is on, and rounds it to about a kilometre before asking Open-Meteo.
-        NSAppleEventsUsageDescription: Liova turns repeat on and off for players that only allow it through their own scripting, like Spotify. It asks the first time you press repeat in the notch, and does nothing else with the player.
+        NSAppleEventsUsageDescription: Liova asks this app for one thing you chose in the notch, such as bringing the terminal tab your coding agent runs in to the front, or turning repeat on in a player like Spotify. It does nothing else with the app.
         NSCalendarsFullAccessUsageDescription: Liova shows your next meeting in the notch and lists today's events. Events never leave your Mac.
         CFBundleURLTypes:
           - CFBundleURLName: app.liova.Liova
@@ -117,8 +117,9 @@ targets:
         # Hardened runtime refuses calendar access without this, silently: no prompt, and
         # Liova never appears in Privacy & Security > Calendars. Used only for Calendar.
         com.apple.security.personal-information.calendars: true
-        # Hardened runtime blocks Apple Events without this. Used only for repeat in players
-        # that don't offer it to macOS (Spotify), after the user allows it.
+        # Hardened runtime blocks Apple Events without this. Used for repeat in players that
+        # don't offer it to macOS (Spotify) and to select an agent's tab in Terminal or iTerm,
+        # each only after the user allows it for that app.
         com.apple.security.automation.apple-events: true
 
 schemes:

@@ -143,16 +143,19 @@ private struct CardActions: View {
         HStack(spacing: 2) {
             button(
                 item.isPinned ? "pin.slash.fill" : "pin.fill",
+                title: item.isPinned ? "Unpin" : "Pin",
                 help: item.isPinned ? "Unpin" : "Keep it, even after Liova quits"
             ) {
                 feature.togglePin(item)
             }
-            button("xmark", help: "Delete") { feature.remove(item) }
+            button("xmark", title: "Delete", help: "Delete") { feature.remove(item) }
         }
         .padding(4)
     }
 
-    private func button(_ symbol: String, help: String, action: @escaping () -> Void) -> some View {
+    private func button(
+        _ symbol: String, title: String, help: String, action: @escaping () -> Void
+    ) -> some View {
         Button { withAnimation(Motion.list) { action() } } label: {
             Image(systemName: symbol)
                 .font(.system(size: 9, weight: .bold))
@@ -162,6 +165,7 @@ private struct CardActions: View {
         }
         .buttonStyle(.plain)
         .help(help)
+        .accessibilityLabel(Text(title))
     }
 }
 

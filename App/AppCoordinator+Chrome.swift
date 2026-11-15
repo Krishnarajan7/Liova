@@ -7,7 +7,6 @@ extension AppCoordinator {
     func configureChrome() {
         let shelf = shelf
         let timers = timers
-        let systemMonitor = systemMonitor
         chrome.addPage(NotchChrome.Page(id: ShelfFeature.pageID, symbol: "tray.full.fill", title: "Shelf") {
             AnyView(ShelfPage(feature: shelf))
         })
@@ -27,21 +26,7 @@ extension AppCoordinator {
             isAvailable: { settings.weatherEnabled },
             content: { AnyView(WeatherPage(feature: weather)) }
         ))
-        chrome.addPage(NotchChrome.Page(id: "system", symbol: "gauge.with.dots.needle.67percent", title: "System") {
-            AnyView(SystemPage(feature: systemMonitor))
-        })
-        let clipboard = clipboard
-        chrome.addPage(NotchChrome.Page(
-            id: ClipboardFeature.pageID, symbol: "doc.on.clipboard.fill", title: "Clipboard",
-            isAvailable: { clipboard.isEnabled },
-            content: { AnyView(ClipboardPage(feature: clipboard)) }
-        ))
-        let recording = recording
-        chrome.addPage(NotchChrome.Page(
-            id: RecordingFeature.pageID, symbol: "record.circle", title: "Record",
-            isAvailable: { recording.isEnabled },
-            content: { AnyView(RecordingPage(feature: recording)) }
-        ))
+        addToolPages()
         chrome.dropPageID = ShelfFeature.pageID
         let battery = battery
         let capture = capture
@@ -55,5 +40,75 @@ extension AppCoordinator {
             Self.trailingStatus(battery: battery, capture: capture, headphones: headphones)
         }
         chrome.openSettings = { [weak self] in self?.showSettings() }
+    }
+
+    /// System, Clipboard, Sound and Record.
+    private func addToolPages() {
+        let systemMonitor = systemMonitor
+        chrome.addPage(NotchChrome.Page(id: "system", symbol: "gauge.with.dots.needle.67percent", title: "System") {
+            AnyView(SystemPage(feature: systemMonitor))
+        })
+        let clipboard = clipboard
+        chrome.addPage(NotchChrome.Page(
+            id: ClipboardFeature.pageID, symbol: "doc.on.clipboard.fill", title: "Clipboard",
+            isAvailable: { clipboard.isEnabled },
+            content: { AnyView(ClipboardPage(feature: clipboard)) }
+        ))
+        let sound = sound
+        chrome.addPage(NotchChrome.Page(
+            id: SoundFeature.pageID, symbol: "speaker.wave.2.fill", title: "Sound",
+            isAvailable: { sound.isEnabled },
+            content: { AnyView(SoundPage(feature: sound)) }
+        ))
+        let recording = recording
+        chrome.addPage(NotchChrome.Page(
+            id: RecordingFeature.pageID, symbol: "record.circle", title: "Record",
+            isAvailable: { recording.isEnabled },
+            content: { AnyView(RecordingPage(feature: recording)) }
+        ))
+    }
+}
+
+extension AppCoordinator {
+    /// Beside the camera in the open notch. Never squeezed: when everything doesn't fit,
+    /// details drop one at a time (headphones level, charging bolt, battery percentage, then
+    /// camera and mic icons become dots, then headphones and battery go), each still in its
+    /// tooltip, instead of wrapping or pushing the gear past the notch's edge.
+    static func trailingStatus(
+        battery: BatteryFeature, capture: CaptureIndicatorFeature, headphones: HeadphonesFeature
+    ) -> AnyView {
+        AnyView(ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                CaptureStatusView(feature: capture)
+                HeadphonesStatusView(feature: headphones)
+                BatteryStatusView(feature: battery)
+            }
+            HStack(spacing: 6) {
+                CaptureStatusView(feature: capture)
+                HeadphonesStatusView(feature: headphones, isCompact: true)
+                BatteryStatusView(feature: battery)
+            }
+            HStack(spacing: 6) {
+                CaptureStatusView(feature: capture)
+                HeadphonesStatusView(feature: headphones, isCompact: true)
+                BatteryStatusView(feature: battery, detail: .percentage)
+            }
+            HStack(spacing: 6) {
+                CaptureStatusView(feature: capture)
+                HeadphonesStatusView(feature: headphones, isCompact: true)
+                BatteryStatusView(feature: battery, detail: .icon)
+            }
+            HStack(spacing: 5) {
+                CaptureStatusView(feature: capture, isCompact: true)
+                HeadphonesStatusView(feature: headphones, isCompact: true)
+                BatteryStatusView(feature: battery, detail: .icon)
+            }
+            // The last resort must always fit: the camera and mic dots, which matter most.
+            HStack(spacing: 5) {
+                CaptureStatusView(feature: capture, isCompact: true)
+                BatteryStatusView(feature: battery, detail: .icon)
+            }
+            CaptureStatusView(feature: capture, isCompact: true)
+        })
     }
 }

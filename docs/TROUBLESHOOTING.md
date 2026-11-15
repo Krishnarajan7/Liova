@@ -10,3 +10,5 @@
   ```bash
   log show --last 10m --predicate 'subsystem == "app.liova.Liova"' > liova.log
   ```
+
+  If Liova crashed or froze, **Settings → About** says how many problem reports are on your Mac and shows them in Finder; attach the newest. They never leave your Mac unless you share them. Crash reports are the ones macOS writes to `~/Library/Logs/DiagnosticReports`; reports of hangs and runaway CPU use are saved to `~/Library/Logs/Liova`.

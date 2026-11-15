@@ -208,6 +208,7 @@ private struct ShelfTile: View {
                 }
                 .buttonStyle(.plain)
                 .offset(x: 4, y: -4)
+                .accessibilityLabel(Text("Remove from Shelf"))
             }
         }
         .onHover { isHovered = $0 }
@@ -224,5 +225,13 @@ private struct ShelfTile: View {
             Button("Remove from Shelf") { withAnimation(Motion.list) { feature.remove(item.id) } }
         }
         .help(url?.path ?? "\(item.name) can't be found")
+        // The remove button only appears under the pointer, and opening takes a double
+        // click: VoiceOver gets both as actions on the file itself.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(url == nil ? "\(item.name), can't be found" : item.name))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { feature.open(item) }
+        .accessibilityAction(named: Text("Show in Finder")) { feature.revealInFinder(item) }
+        .accessibilityAction(named: Text("Remove from Shelf")) { feature.remove(item.id) }
     }
 }

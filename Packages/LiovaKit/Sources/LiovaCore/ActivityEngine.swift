@@ -165,7 +165,19 @@ public final class ActivityEngine {
         expiryTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(delay), tolerance: .milliseconds(20))
             guard !Task.isCancelled else { return }
-            self?.purgeExpired()
+            self?.expiryElapsed()
+        }
+    }
+
+    /// The sleep is measured on the continuous clock and deadlines are wall-clock dates, so
+    /// the wall clock can still be short of the deadline here (it was set back, or is being
+    /// slewed). Then nothing is purged and nothing reschedules: wait out the remainder, or the
+    /// activity would stay up until some unrelated change.
+    private func expiryElapsed() {
+        expiryTask = nil
+        purgeExpired()
+        if expiryTask == nil {
+            scheduleExpiry()
         }
     }
 }

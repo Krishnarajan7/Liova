@@ -90,10 +90,13 @@ private struct TimerCard: View {
             }
             Spacer(minLength: 0)
             HStack(spacing: 6) {
-                TimerButton(symbol: "plus", label: "1 min") {
+                TimerButton(symbol: "plus", label: "1 min", spoken: "Add 1 minute") {
                     withAnimation(Motion.list) { feature.extend(timer.id, by: 60) }
                 }
-                TimerButton(symbol: timer.isPaused ? "play.fill" : "pause.fill", label: nil) {
+                TimerButton(
+                    symbol: timer.isPaused ? "play.fill" : "pause.fill", label: nil,
+                    spoken: timer.isPaused ? "Resume" : "Pause"
+                ) {
                     withAnimation(Motion.list) {
                         if timer.isPaused {
                             feature.resume(timer.id)
@@ -102,7 +105,7 @@ private struct TimerCard: View {
                         }
                     }
                 }
-                TimerButton(symbol: "xmark", label: nil, tint: .red) {
+                TimerButton(symbol: "xmark", label: nil, spoken: "Cancel timer", tint: .red) {
                     withAnimation(Motion.list) { feature.cancel(timer.id) }
                 }
             }
@@ -131,6 +134,8 @@ private struct RingStyle: ProgressViewStyle {
 private struct TimerButton: View {
     let symbol: String
     let label: String?
+    /// What VoiceOver and the tooltip say: the icon alone says nothing.
+    let spoken: String
     var tint: Color = .white
     let action: () -> Void
     @State private var isHovered = false
@@ -151,6 +156,8 @@ private struct TimerButton: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
+        .help(spoken)
+        .accessibilityLabel(Text(spoken))
     }
 }
 

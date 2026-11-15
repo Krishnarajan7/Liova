@@ -26,6 +26,37 @@ struct LiovaSettingsTests {
         #expect(settings.resourceAlertsEnabled)
     }
 
+    @Test func everyPreferenceChangeRaisesTheRevision() {
+        let settings = LiovaSettings(defaults: defaults)
+        var last = settings.revision
+        func changed() -> Bool {
+            defer { last = settings.revision }
+            return settings.revision > last
+        }
+        settings.hudStyle = .notch
+        #expect(changed())
+        settings.musicBars = .off
+        #expect(changed())
+        settings.hoverDelay = 0.5
+        #expect(changed())
+        settings.weatherPlace = WeatherPlace(name: "Chennai", latitude: 13.08, longitude: 80.27)
+        #expect(changed())
+        settings.weatherPlace = nil
+        #expect(changed())
+        settings.customShortcuts = [:]
+        #expect(changed())
+    }
+
+    @Test func bookkeepingDoesNotRaiseTheRevision() {
+        let settings = LiovaSettings(defaults: defaults)
+        let before = settings.revision
+        settings.hasSeenWelcome = true
+        settings.lastUpdateCheck = Date()
+        settings.skippedUpdateVersion = "9.9.9"
+        settings.skippedUpdateVersion = nil
+        #expect(settings.revision == before)
+    }
+
     @Test func notchStyleIsRemembered() {
         LiovaSettings(defaults: defaults).notchStyle = .glass
         #expect(LiovaSettings(defaults: defaults).notchStyle == .glass)

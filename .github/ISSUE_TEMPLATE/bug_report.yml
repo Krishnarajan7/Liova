@@ -101,7 +101,7 @@ body:
       description: |
         Screenshots or a short screen recording help a lot for visual bugs.
         For logs, run `log show --last 10m --predicate 'subsystem BEGINSWITH "app.liova"'` in Terminal and paste the relevant part.
-        Crash reports are in Console.app → Crash Reports. Remove anything personal before pasting.
+        After a crash or freeze, Settings → About → Show in Finder selects Liova's problem reports: attach the newest. Remove anything personal first.
       render: text
 
   - type: checkboxes

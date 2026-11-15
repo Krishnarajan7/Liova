@@ -155,11 +155,7 @@ struct FeatureSnapshotExport {
     }
 
     @Test func sideHUD() throws {
-        for (name, state) in [
-            ("sidehud-1-volume-high", SideHUDState(kind: .volume, level: 0.85, symbol: "speaker.wave.3.fill")),
-            ("sidehud-2-volume-low", SideHUDState(kind: .volume, level: 0.25, symbol: "speaker.wave.1.fill")),
-            ("sidehud-3-brightness", SideHUDState(kind: .brightness, level: 0.6, symbol: "sun.max.fill")),
-        ] {
+        for (name, state) in sideHUDStates {
             let model = SideHUDModel(edge: state.kind == .brightness ? .leading : .trailing)
             model.state = state
             model.isVisible = true
@@ -382,3 +378,21 @@ extension FeatureSnapshotExport {
         try render("weather-2-rain-closed", .closed)
     }
 }
+
+/// The side pill at its interesting levels.
+private let sideHUDStates: [(String, SideHUDState)] = [
+    ("sidehud-1-volume-high", SideHUDState(kind: .volume, level: 0.85, symbol: "speaker.wave.3.fill")),
+    ("sidehud-2-volume-low", SideHUDState(kind: .volume, level: 0.25, symbol: "speaker.wave.1.fill")),
+    ("sidehud-3-brightness", SideHUDState(kind: .brightness, level: 0.6, symbol: "sun.max.fill")),
+    ("sidehud-4-volume-muted", SideHUDState(
+        kind: .volume, level: 0.4, isMuted: true, symbol: "speaker.slash.fill"
+    )),
+    ("sidehud-5-volume-full", SideHUDState(kind: .volume, level: 1, symbol: "speaker.wave.3.fill")),
+    ("sidehud-6-brightness-low", SideHUDState(kind: .brightness, level: 0.08, symbol: "sun.min.fill")),
+    ("sidehud-7-light-volume", SideHUDState(
+        kind: .volume, level: 0.6, symbol: "speaker.wave.2.fill", look: .light
+    )),
+    ("sidehud-8-light-brightness", SideHUDState(
+        kind: .brightness, level: 0.85, symbol: "sun.max.fill", look: .light
+    )),
+]

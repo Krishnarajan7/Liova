@@ -49,6 +49,8 @@ public final class MediaRemoteAdapterProvider: NowPlayingProviding {
 
     private static let log = Logger(subsystem: "app.liova.Liova", category: "nowplaying")
     private static let maxConsecutiveFailures = 5
+    /// How often to try again once the helper has failed that many times in a row.
+    private static let brokenRetryInterval: TimeInterval = 600
     /// A run shorter than this counts as a failure for backoff purposes.
     private static let healthyRunDuration: TimeInterval = 10
 
@@ -129,6 +131,7 @@ public final class MediaRemoteAdapterProvider: NowPlayingProviding {
         ]
         let startedAt = Date()
         let stream = AdapterStream(executable: perl, arguments: arguments) { [weak self] info in
+            self?.isAvailable = true // it works (again)
             self?.onChange?(info)
         } onExit: { [weak self] status in
             self?.streamExited(status: status, ranFor: Date().timeIntervalSince(startedAt))
@@ -148,13 +151,18 @@ public final class MediaRemoteAdapterProvider: NowPlayingProviding {
         stream = nil
         onChange?(nil)
         consecutiveFailures = duration >= Self.healthyRunDuration ? 1 : consecutiveFailures + 1
-        guard consecutiveFailures < Self.maxConsecutiveFailures else {
+        let delay: TimeInterval
+        if consecutiveFailures < Self.maxConsecutiveFailures {
+            delay = min(30, pow(2, Double(consecutiveFailures - 1)))
+            Self.log.notice("Now Playing helper exited (status \(status)); restarting in \(delay)s")
+        } else {
+            // Something is wrong beyond a hiccup, but it may not stay wrong (the media service
+            // restarting, a Mac still starting up): say so, and try again now and then rather
+            // than leave the notch without music until Liova is relaunched.
             isAvailable = false
-            Self.log.error("Now Playing helper keeps exiting (status \(status)); giving up")
-            return
+            delay = Self.brokenRetryInterval
+            Self.log.error("Now Playing helper keeps exiting (status \(status)); next try in \(delay)s")
         }
-        let delay = min(30, pow(2, Double(consecutiveFailures - 1)))
-        Self.log.notice("Now Playing helper exited (status \(status)); restarting in \(delay)s")
         restartTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(delay))
             guard let self, !Task.isCancelled, onChange != nil else { return }
@@ -238,10 +246,14 @@ private final class AdapterStream: @unchecked Sendable {
 
     private func receive(_ chunk: Data) {
         guard !chunk.isEmpty else { return } // EOF; terminationHandler reports the exit
+        // Only the new bytes can hold a newline: everything before them was searched already.
+        // Artwork lines are megabytes long and arrive in small chunks.
+        var searchFrom = buffer.endIndex
         buffer.append(chunk)
-        while let newline = buffer.firstIndex(of: 0x0A) {
+        while let newline = buffer[searchFrom...].firstIndex(of: 0x0A) {
             let line = buffer[buffer.startIndex ..< newline]
             buffer.removeSubrange(buffer.startIndex ... newline)
+            searchFrom = buffer.startIndex
             handle(Data(line))
         }
         if buffer.count > Self.maxLineBytes {

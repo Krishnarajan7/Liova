@@ -138,6 +138,11 @@ public struct AgentSession: Identifiable, Equatable, Sendable {
 
 /// A permission request waiting for the user's answer.
 public struct AgentPermissionPrompt: Identifiable, Equatable, Sendable {
+    /// The same key its session is kept under.
+    var sessionKey: String {
+        "\(agent).\(sessionID)"
+    }
+
     public let id: UUID
     public var agent: String
     public var sessionID: String

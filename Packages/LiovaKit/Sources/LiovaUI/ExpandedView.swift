@@ -74,7 +74,7 @@ struct ExpandedView: View {
                         .transition(.opacity)
                 }
                 if let openSettings = chrome.openSettings {
-                    HeaderButton(symbol: "gearshape.fill", action: openSettings)
+                    HeaderButton(symbol: "gearshape.fill", title: "Settings", action: openSettings)
                 }
             }
             .frame(minWidth: 0, maxWidth: .infinity)
@@ -206,6 +206,8 @@ private struct PageBar: View {
                 }
                 .buttonStyle(.plain)
                 .help(title(for: id))
+                .accessibilityLabel(Text(title(for: id)))
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }
     }
@@ -221,6 +223,7 @@ private struct PageBar: View {
 
 private struct HeaderButton: View {
     let symbol: String
+    let title: String
     let action: () -> Void
     @State private var isHovered = false
 
@@ -234,6 +237,8 @@ private struct HeaderButton: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
+        .help(title)
+        .accessibilityLabel(Text(title))
     }
 }
 
@@ -254,6 +259,8 @@ private struct BriefChip: View {
         .frame(height: 22)
         .background(activity.tint.color.opacity(0.14), in: Capsule())
         .frame(maxWidth: 120, alignment: .trailing)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(activity.spokenSummary))
     }
 
     private var label: String {
@@ -297,6 +304,9 @@ private struct ActivityCard: View {
                     .contentTransition(.numericText())
             }
         }
+        // One element, read as a sentence, instead of an icon, two texts and a bar.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(activity.spokenSummary))
     }
 }
 
@@ -334,6 +344,7 @@ private struct ActivityRow: View {
         .onHover { isHovered = $0 }
         .animation(.easeOut(duration: 0.12), value: isHovered)
         .help("Show \(activity.title) first")
+        .accessibilityLabel(Text(activity.spokenSummary))
         .accessibilityHint(Text("Shows this activity first"))
     }
 }
@@ -354,6 +365,7 @@ private struct EmptyState: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
+        .accessibilityElement(children: .combine)
     }
 }
 

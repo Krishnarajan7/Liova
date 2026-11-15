@@ -29,6 +29,7 @@ final class AppCoordinator {
     @ObservationIgnored private lazy var resourceAlerts = ResourceAlertFeature(engine: engine, settings: settings)
     @ObservationIgnored private lazy var calls = CallFeature(engine: engine, settings: settings)
     @ObservationIgnored lazy var clipboard = ClipboardFeature(settings: settings)
+    @ObservationIgnored lazy var sound = SoundFeature(settings: settings)
     @ObservationIgnored lazy var hotkeys = HotkeyFeature(settings: settings)
     @ObservationIgnored lazy var recording = RecordingFeature(engine: engine, settings: settings)
     @ObservationIgnored private lazy var unlock = UnlockFeature(engine: engine, settings: settings)
@@ -64,6 +65,8 @@ final class AppCoordinator {
     @ObservationIgnored private var settingsObservation: ObservationLoop?
     @ObservationIgnored private var demoTask: Task<Void, Never>?
     @ObservationIgnored private var isStopped = false
+    /// Saves crash and hang reports to ~/Library/Logs/Liova. Nothing is sent anywhere.
+    @ObservationIgnored private let problemReports = ProblemReportRecorder()
 
     @ObservationIgnored private var accessibilityObserver: (any NSObjectProtocol)?
     /// Volume on the right edge, brightness on the left.
@@ -72,7 +75,7 @@ final class AppCoordinator {
 
     init() {
         hud = HUDFeature(engine: engine, settings: settings)
-        agents = AgentIslandFeature(engine: engine, settings: settings)
+        agents = AgentIslandFeature(engine: engine, settings: settings, focus: SystemAgentTerminalFocus())
         downloads = DownloadsFeature(engine: engine, settings: settings)
     }
 
@@ -110,44 +113,15 @@ final class AppCoordinator {
         updates.syncWithSettings()
         startPluginServer()
         observeSettings()
+        problemReports.start()
         Log.app.info("Liova started")
     }
 
-    /// Every feature rechecks its settings when any of these change.
+    /// Every feature rechecks its settings when any preference changes.
     private func observeSettings() {
         settingsObservation = ObservationLoop { [weak self] in
-            guard let self else { return }
-            // Reading these registers interest; any change reruns the reaction below.
-            _ = (
-                settings.displayPlacement,
-                settings.showVirtualNotchWhenIdle,
-                settings.hideInFullScreen,
-                settings.notchStyle,
-                settings.batteryActivitiesEnabled,
-                settings.lowBatteryThreshold,
-                settings.nowPlayingEnabled,
-                settings.lyricsEnabled,
-                settings.lyricsInClosedNotch,
-                settings.hudReplacementEnabled,
-                settings.agentIslandEnabled,
-                settings.agentsOverMusic,
-                settings.downloadsEnabled,
-                settings.telegramDownloadsEnabled,
-                settings.captureIndicatorEnabled,
-                settings.resourceAlertsEnabled,
-                settings.callControlsEnabled,
-                settings.clipboardHistoryEnabled,
-                settings.hotkeysEnabled,
-                settings.customShortcuts,
-                settings.recordingControlsEnabled,
-                settings.unlockAnimationEnabled,
-                settings.headphonesEnabled,
-                settings.calendarEnabled,
-                settings.weatherEnabled,
-                settings.weatherPlace,
-                settings.rainAlertsEnabled,
-                settings.automaticUpdateChecks
-            )
+            // Reading this registers interest; any change reruns the reaction below.
+            _ = self?.settings.revision
         } onChange: { [weak self] in
             self?.syncFeaturesWithSettings()
         }
@@ -165,6 +139,7 @@ final class AppCoordinator {
         resourceAlerts.syncWithSettings()
         calls.syncWithSettings()
         clipboard.syncWithSettings()
+        sound.syncWithSettings()
         recording.syncWithSettings()
         hotkeys.syncWithSettings()
         unlock.syncWithSettings()
@@ -180,6 +155,7 @@ final class AppCoordinator {
         ipcServer?.stop()
         ipcServer = nil
         settingsObservation = nil
+        problemReports.stop()
         if let accessibilityObserver {
             DistributedNotificationCenter.default().removeObserver(accessibilityObserver)
         }
@@ -192,6 +168,7 @@ final class AppCoordinator {
         resourceAlerts.stop()
         calls.stop()
         clipboard.stop()
+        sound.stop()
         hotkeys.stop()
         recording.stop()
         unlock.stop()
@@ -305,13 +282,16 @@ private extension AppCoordinator {
     func startPluginServer() {
         let executor = executor
         let agents = agents
-        let server = IPCServer(handler: IPCClosureHandler { command, _ in
+        let server = IPCServer(handler: IPCClosureHandler { command, client in
+            // The hook that's reporting is still running while Liova answers it, so its
+            // ancestors (the agent, its shell, the terminal app) can be looked up from it.
+            let origin: @MainActor () -> AgentTerminal? = { client.pid.flatMap(AgentTerminalLocator.locate(from:)) }
             switch command {
             case let .agentEvent(event):
-                await agents.handle(event)
+                await agents.handle(event, origin: origin)
                 return .success()
             case let .agentPermission(request):
-                return await .decided(agents.requestPermission(request))
+                return await .decided(agents.requestPermission(request, origin: origin))
             default:
                 return await executor.execute(command, origin: .socket)
             }
@@ -324,50 +304,6 @@ private extension AppCoordinator {
             // Liova still works without the socket; only external activities are unavailable.
             Log.app.error("Plugin socket failed to start: \(String(describing: error), privacy: .public)")
         }
-    }
-}
-
-extension AppCoordinator {
-    /// Beside the camera in the open notch. Never squeezed: when everything doesn't fit,
-    /// details drop one at a time (headphones level, charging bolt, battery percentage, then
-    /// camera and mic icons become dots, then headphones and battery go), each still in its
-    /// tooltip, instead of wrapping or pushing the gear past the notch's edge.
-    static func trailingStatus(
-        battery: BatteryFeature, capture: CaptureIndicatorFeature, headphones: HeadphonesFeature
-    ) -> AnyView {
-        AnyView(ViewThatFits(in: .horizontal) {
-            HStack(spacing: 8) {
-                CaptureStatusView(feature: capture)
-                HeadphonesStatusView(feature: headphones)
-                BatteryStatusView(feature: battery)
-            }
-            HStack(spacing: 6) {
-                CaptureStatusView(feature: capture)
-                HeadphonesStatusView(feature: headphones, isCompact: true)
-                BatteryStatusView(feature: battery)
-            }
-            HStack(spacing: 6) {
-                CaptureStatusView(feature: capture)
-                HeadphonesStatusView(feature: headphones, isCompact: true)
-                BatteryStatusView(feature: battery, detail: .percentage)
-            }
-            HStack(spacing: 6) {
-                CaptureStatusView(feature: capture)
-                HeadphonesStatusView(feature: headphones, isCompact: true)
-                BatteryStatusView(feature: battery, detail: .icon)
-            }
-            HStack(spacing: 5) {
-                CaptureStatusView(feature: capture, isCompact: true)
-                HeadphonesStatusView(feature: headphones, isCompact: true)
-                BatteryStatusView(feature: battery, detail: .icon)
-            }
-            // The last resort must always fit: the camera and mic dots, which matter most.
-            HStack(spacing: 5) {
-                CaptureStatusView(feature: capture, isCompact: true)
-                BatteryStatusView(feature: battery, detail: .icon)
-            }
-            CaptureStatusView(feature: capture, isCompact: true)
-        })
     }
 }
 

@@ -29,7 +29,7 @@ Music and lyrics, charging, AirPods, downloads and your coding agents, right whe
 </tr>
 <tr>
 <td><b>Now Playing and synced lyrics.</b> Any app, with the line being sung under the closed notch.</td>
-<td><b>Agent Island.</b> See what Claude Code, Codex, Gemini CLI or Cursor is doing, and answer from the notch.</td>
+<td><b>Agent Island.</b> See what Claude Code, Codex, Gemini CLI or Cursor is doing, and answer from the notch, or jump to its terminal.</td>
 </tr>
 <tr>
 <td><img src="docs/images/notch-charging.jpg" alt="The closed notch showing a green charging bolt and 76%"></td>
@@ -41,7 +41,7 @@ Music and lyrics, charging, AirPods, downloads and your coding agents, right whe
 </tr>
 </table>
 
-And a **File Shelf** with AirDrop, **volume and brightness HUDs**, **timers**, your **next meeting** with a Join button, **weather** with a rain heads-up, **camera and mic alerts**, live **system stats**, and a notch on **every display**, notched or not.
+And a **File Shelf** with AirDrop, **volume and brightness HUDs**, a **Sound** page to switch speakers and microphone, **timers**, your **next meeting** with a Join button, **weather** with a rain heads-up, **camera and mic alerts**, live **system stats**, and a notch on **every display**, notched or not.
 
 Anything can light up the notch, from any script:
 

@@ -38,10 +38,64 @@ public final class AgentIslandRenderer: ActivityRenderer {
     }
 
     public func expanded(for activity: Activity) -> AnyView? {
-        guard let promptID = AgentIslandPolicy.promptID(from: activity.id),
-              let prompt = feature.prompt(promptID)
+        if let promptID = AgentIslandPolicy.promptID(from: activity.id) {
+            return feature.prompt(promptID).map { AnyView(PermissionCard(prompt: $0, feature: feature)) }
+        }
+        // A session Liova can take you to gets a card with a way there; any other keeps
+        // the standard card.
+        guard let session = feature.session(for: activity.id),
+              feature.canJump(toAgent: session.agent, sessionID: session.sessionID)
         else { return nil }
-        return AnyView(PermissionCard(prompt: prompt, feature: feature))
+        return AnyView(SessionCard(activity: activity, session: session, feature: feature))
+    }
+}
+
+/// A session's card: what the agent is doing, and a button that goes to its terminal.
+private struct SessionCard: View {
+    let activity: Activity
+    let session: AgentSession
+    let feature: AgentIslandFeature
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: activity.symbol ?? "sparkle")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(activity.tint.color)
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 40, height: 40)
+                .background(activity.tint.color.opacity(0.18), in: RoundedRectangle(cornerRadius: 10))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(activity.title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                if let subtitle = activity.subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .lineLimit(1)
+                }
+            }
+            .accessibilityElement(children: .combine)
+            Spacer(minLength: 0)
+            Button {
+                feature.jumpToTerminal(agent: session.agent, sessionID: session.sessionID)
+            } label: {
+                Label("Go to it", systemImage: "arrow.up.forward.app.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white.opacity(isHovered ? 1 : 0.85))
+                    .padding(.horizontal, 11)
+                    .frame(height: 26)
+                    .background(.white.opacity(isHovered ? 0.2 : 0.12), in: Capsule())
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .onHover { isHovered = $0 }
+            .animation(.easeOut(duration: 0.12), value: isHovered)
+            .help("Bring this session's terminal to the front")
+        }
     }
 }
 
@@ -80,6 +134,8 @@ private struct PermissionCard: View {
             HStack(spacing: 8) {
                 DecisionButton(title: "Answer in Terminal", style: .quiet) {
                     feature.answer(prompt.id, with: .ask)
+                    // Take them there: that's where the agent's own prompt now waits.
+                    feature.jumpToTerminal(agent: prompt.agent, sessionID: prompt.sessionID)
                 }
                 Spacer(minLength: 0)
                 DecisionButton(title: "Deny", style: .destructive) {

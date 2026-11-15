@@ -1,5 +1,6 @@
 import LiovaCore
 import LiovaFeatures
+import LiovaProviders
 import SwiftUI
 
 /// The Settings window's tabs, so other parts of the app can open one.
@@ -145,8 +146,11 @@ private struct ActivitySettings: View {
                 if nowPlaying.isAvailable {
                     Text("Shows music, podcasts and video from any app, with artwork and controls.")
                 } else {
-                    Text("Now Playing isn't available in this build. Run `make vendor` and rebuild.")
-                        .foregroundStyle(.orange)
+                    Text(
+                        "Now Playing isn't working right now. Liova keeps trying. "
+                            + "If you built Liova yourself, run `make vendor` and rebuild."
+                    )
+                    .foregroundStyle(.orange)
                 }
             }
             Section {
@@ -198,6 +202,11 @@ private struct ActivitySettings: View {
                         + "and whether you're muted. Mute works in every app; Hang Up presses the app's own "
                         + "Leave button, which needs Accessibility access."
                 )
+            }
+            Section {
+                Toggle("Sound: choose speakers and microphone", isOn: $settings.soundPageEnabled)
+            } footer: {
+                Text("A page in the open notch that lists where sound can go and come from. Click one to use it.")
             }
             Section {
                 Toggle("Clipboard history", isOn: $settings.clipboardHistoryEnabled)
@@ -263,6 +272,7 @@ private struct HUDSettings: View {
                     .disabled(HUDFeature.isSafeModeRequested)
                 Picker("Style", selection: $settings.hudStyle) {
                     Text("Side bar").tag(HUDStyle.sideBar)
+                    Text("Edge light").tag(HUDStyle.edgeLight)
                     Text("In the notch").tag(HUDStyle.notch)
                 }
                 .disabled(!settings.hudReplacementEnabled)
@@ -317,6 +327,8 @@ private struct HUDSettings: View {
 
 private struct AboutSettings: View {
     @State private var showsLicenses = false
+    /// Nil until the folders have been looked at.
+    @State private var problemReports: [ProblemReport]?
 
     var body: some View {
         VStack(spacing: 10) {
@@ -343,9 +355,31 @@ private struct AboutSettings: View {
             }
             .font(.caption)
             .foregroundStyle(.secondary)
+            if let problemReports, !problemReports.isEmpty {
+                HStack(spacing: 6) {
+                    Text(Self.summary(of: problemReports.count))
+                    Button("Show in Finder") {
+                        NSWorkspace.shared.activateFileViewerSelecting(problemReports.map(\.url))
+                    }
+                    .buttonStyle(.link)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .help("Crash and hang reports stay on this Mac. Attach them when you report an issue.")
+            }
         }
         .padding(24)
         .frame(maxWidth: .infinity)
         .sheet(isPresented: $showsLicenses) { LicensesView() }
+        .task { problemReports = await Self.findProblemReports() }
+    }
+
+    /// Lists two folders; off the main thread because the system one can hold hundreds of files.
+    @concurrent private static func findProblemReports() async -> [ProblemReport] {
+        ProblemReportStore().recent()
+    }
+
+    static func summary(of count: Int) -> String {
+        count == 1 ? "1 problem report in the last 30 days ·" : "\(count) problem reports in the last 30 days ·"
     }
 }

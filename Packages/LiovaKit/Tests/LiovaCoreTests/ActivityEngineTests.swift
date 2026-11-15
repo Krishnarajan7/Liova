@@ -155,6 +155,23 @@ struct ActivityEngineTests {
         #expect(engine.current == nil)
     }
 
+    /// The expiry sleep runs on the continuous clock and deadlines are wall-clock dates. When
+    /// the wall clock is behind at wake-up (it was set back or slewed), the engine must keep
+    /// waiting rather than leave the activity up for good.
+    @Test func expiryRetriesWhenTheWallClockIsBehind() async throws {
+        let clock = TestClock()
+        let engine = ActivityEngine(now: { clock.now })
+        try engine.start(activity("hud", priority: .critical, expiresAt: clock.now + 0.03))
+        // The sleep ends, but by the wall clock the deadline hasn't come yet.
+        try await Task.sleep(for: .milliseconds(120))
+        #expect(engine.current?.id == "hud")
+        clock.advance(1)
+        for _ in 0 ..< 50 where engine.current != nil {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(engine.current == nil)
+    }
+
     @Test func perSourceLimitIsEnforced() throws {
         let engine = makeEngine(limits: .init(maxActivitiesPerSource: 2, maxActivities: 10))
         try engine.start(activity("1", source: "spammy"))

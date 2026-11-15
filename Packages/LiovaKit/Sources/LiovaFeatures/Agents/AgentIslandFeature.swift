@@ -1,6 +1,7 @@
 import Foundation
 import LiovaCore
 import LiovaPluginKit
+import LiovaProviders
 import Observation
 
 /// Agent Island: coding agents (Claude Code, Codex, Cursor, Gemini CLI) in the notch.
@@ -16,6 +17,8 @@ public final class AgentIslandFeature {
     public private(set) var sessions: [String: AgentSession] = [:]
     /// Waiting prompts, oldest first.
     public private(set) var prompts: [AgentPermissionPrompt] = []
+    /// The app (and terminal device) each session runs in, by session key, once known.
+    public private(set) var terminals: [String: AgentTerminal] = [:]
 
     /// Called when a prompt appears (to open the notch) and when the last one is answered.
     @ObservationIgnored public var onAttentionChange: ((Bool) -> Void)?
@@ -23,6 +26,7 @@ public final class AgentIslandFeature {
     @ObservationIgnored private let engine: ActivityEngine
     @ObservationIgnored private let settings: LiovaSettings
     @ObservationIgnored private let now: @Sendable () -> Date
+    @ObservationIgnored private let focus: (any AgentTerminalFocusing)?
     @ObservationIgnored private var waiters: [UUID: CheckedContinuation<AgentDecision, Never>] = [:]
     @ObservationIgnored private var deadlines: [UUID: Task<Void, Never>] = [:]
     /// The "agents over music" choice the live sessions were published with.
@@ -31,9 +35,15 @@ public final class AgentIslandFeature {
     public static let maxSessions = 32
     public static let maxPrompts = 8
 
-    public init(engine: ActivityEngine, settings: LiovaSettings, now: @escaping @Sendable () -> Date = Date.init) {
+    public init(
+        engine: ActivityEngine,
+        settings: LiovaSettings,
+        focus: (any AgentTerminalFocusing)? = nil,
+        now: @escaping @Sendable () -> Date = Date.init
+    ) {
         self.engine = engine
         self.settings = settings
+        self.focus = focus
         self.now = now
     }
 
@@ -64,12 +74,48 @@ public final class AgentIslandFeature {
             finish(prompt.id, with: .ask)
         }
         sessions.removeAll()
+        terminals.removeAll()
         engine.endAll(source: AgentIslandPolicy.source)
+    }
+
+    // MARK: - Jump to the terminal
+
+    /// Whether Liova knows where this session runs, so the card can offer to go there.
+    public func canJump(toAgent agent: String, sessionID: String) -> Bool {
+        focus != nil && terminals["\(agent).\(sessionID)"] != nil
+    }
+
+    /// Brings the session's terminal (its tab, where the app can be asked) to the front.
+    public func jumpToTerminal(agent: String, sessionID: String) {
+        let key = "\(agent).\(sessionID)"
+        guard let focus, let terminal = terminals[key] else { return }
+        Log.feature.info("Jumping to an agent's terminal")
+        focus.focus(terminal, project: sessions[key]?.project ?? prompts.first { $0.sessionKey == key }?.project)
+    }
+
+    /// The session an activity in the notch stands for, if it's a session's.
+    public func session(for activityID: ActivityID) -> AgentSession? {
+        sessions.values.first {
+            AgentIslandPolicy.sessionActivityID(agent: $0.agent, sessionID: $0.sessionID) == activityID
+        }
+    }
+
+    /// Remembers where a session runs, the first time it reports and again when it restarts
+    /// (a resumed session can be in another window). `origin` looks the app up from the
+    /// reporting process, so it's only asked when the answer is needed.
+    private func noteTerminal(for key: String, refresh: Bool, origin: (@MainActor () -> AgentTerminal?)?) {
+        guard let origin, refresh || terminals[key] == nil,
+              terminals[key] != nil || terminals.count < Self.maxSessions + Self.maxPrompts else { return }
+        if let terminal = origin() {
+            terminals[key] = terminal
+            let app = terminal.bundleID ?? "an app"
+            Log.feature.info("Agent session runs in \(app, privacy: .public), tab known: \(terminal.tty != nil)")
+        }
     }
 
     // MARK: - Events
 
-    public func handle(_ event: AgentEvent) {
+    public func handle(_ event: AgentEvent, origin: (@MainActor () -> AgentTerminal?)? = nil) {
         guard isEnabled else { return }
         let key = "\(event.agent).\(event.sessionID)"
         let date = now()
@@ -77,10 +123,12 @@ public final class AgentIslandFeature {
         if event.kind == .sessionEnded {
             answerElsewhere(sessionKey: key)
             sessions[key] = nil
+            terminals[key] = nil
             engine.end(AgentIslandPolicy.sessionActivityID(agent: event.agent, sessionID: event.sessionID))
             return
         }
         guard sessions[key] != nil || sessions.count < Self.maxSessions else { return }
+        noteTerminal(for: key, refresh: event.kind == .sessionStarted, origin: origin)
 
         var session = sessions[key] ?? AgentSession(
             agent: event.agent, sessionID: event.sessionID, project: event.project,
@@ -127,8 +175,12 @@ public final class AgentIslandFeature {
     // MARK: - Permission prompts
 
     /// Shows a prompt and waits for the user's answer (or the deadline).
-    public func requestPermission(_ request: AgentPermissionRequest) async -> AgentDecision {
+    public func requestPermission(
+        _ request: AgentPermissionRequest,
+        origin: (@MainActor () -> AgentTerminal?)? = nil
+    ) async -> AgentDecision {
         guard isEnabled, prompts.count < Self.maxPrompts else { return .ask }
+        noteTerminal(for: "\(request.agent).\(request.sessionID)", refresh: false, origin: origin)
         let prompt = AgentPermissionPrompt(
             id: UUID(), agent: request.agent, sessionID: request.sessionID, project: request.project,
             tool: request.tool, summary: request.summary, deadline: now() + request.timeout
@@ -181,7 +233,7 @@ public final class AgentIslandFeature {
 
     /// The session moved on without us, so its prompts were answered in the terminal.
     private func answerElsewhere(sessionKey: String) {
-        for prompt in prompts where sessionKey == "\(prompt.agent).\(prompt.sessionID)" {
+        for prompt in prompts where sessionKey == prompt.sessionKey {
             finish(prompt.id, with: .ask)
         }
     }

@@ -30,6 +30,14 @@ struct NotchRootView: View {
                 isExpanded: isExpanded,
                 shape: NotchShape(topRadius: spec.topRadius, bottomRadius: spec.bottomRadius)
             )
+            // The closed notch is one thing to VoiceOver: what's live, and a way to open it
+            // that doesn't need a pointer.
+            .accessibilityElement()
+            .accessibilityLabel(Text(engine.current.map(\.spokenSummary) ?? "Liova"))
+            .accessibilityHint(Text("Opens the notch"))
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction(.default, onTap)
+            .accessibilityHidden(isExpanded || hidden)
 
             content(
                 isExpanded: isExpanded,
@@ -80,6 +88,7 @@ struct NotchRootView: View {
                 )
                 .frame(width: compact.bodyWidth, height: compact.height, alignment: .top)
                 .opacity(isExpanded ? 0 : 1)
+                .accessibilityHidden(true) // the surface speaks for the closed notch
                 .scaleEffect(isExpanded ? 0.85 : 1)
                 .animation(isExpanded ? Motion.contentOut : Motion.compactContentIn, value: isExpanded)
                 .environment(\.notchCompactVisible, compactVisible)
@@ -98,6 +107,7 @@ struct NotchRootView: View {
                     .scaleEffect(isExpanded ? 1 : 0.96, anchor: .top)
                     .animation(isExpanded ? Motion.expandedContentIn : Motion.contentOut, value: isExpanded)
                     .allowsHitTesting(isExpanded)
+                    .accessibilityHidden(!isExpanded)
             }
         }
         .frame(width: max(expanded.shapeWidth, compact.shapeWidth), alignment: .top)
@@ -207,6 +217,7 @@ struct ActivitySymbol: View {
             .foregroundStyle(activity.tint.color)
             .contentTransition(.symbolEffect(.replace))
             .frame(width: size + 6, height: size + 6)
+            .accessibilityHidden(true) // decoration: the title says what it is
     }
 }
 

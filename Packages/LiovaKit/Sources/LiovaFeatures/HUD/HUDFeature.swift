@@ -289,12 +289,13 @@ extension HUDFeature {
     }
 
     private func show(_ activity: Activity) {
-        if settings.hudStyle == .sideBar, let sideHUD {
+        if settings.hudStyle != .notch, let sideHUD {
             sideHUD(SideHUDState(
                 kind: activity.title == "Brightness" ? .brightness : .volume,
                 level: activity.progress ?? 0,
                 isMuted: activity.subtitle == "Muted",
-                symbol: activity.symbol ?? "speaker.wave.2.fill"
+                symbol: activity.symbol ?? "speaker.wave.2.fill",
+                look: settings.hudStyle == .edgeLight ? .light : .pill
             ))
             return
         }

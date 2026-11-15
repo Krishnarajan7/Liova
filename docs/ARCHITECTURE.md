@@ -114,6 +114,10 @@ The open notch has a header row beside the camera: page icons on the left (Home 
 - **Calendar** (`CalendarFeature`, opt-in): reloads on `EKEventStoreChanged` and otherwise sleeps until the next moment that matters (an event entering its ten-minute lead time, a minute tick inside it, a start or an end). Video-call links are found in the event's URL, location or notes.
 - **Camera and microphone** (`CaptureIndicatorFeature`): Core Audio and CoreMediaIO "running somewhere" property listeners; no audio or video is read and no permission is needed. Turning on flashes the notch; the open notch's header shows a dot while in use.
 
+### Sound
+
+The Sound page (`SoundFeature`, `CoreAudioDevices`) lists the outputs and inputs macOS lets you choose, marks the one in use, and makes another the default on a click. Three Core Audio property listeners (devices, default output, default input) run only while a Sound page is on screen; devices are identified by their Core Audio UID, and only names and connection types are read.
+
 ### File Shelf
 
 Dragging files anywhere is recognized without reading them: at mouse-down the drag pasteboard's change count is noted, and the first drag event after a drag session begins checks only the advertised types for file URLs, once per drag (`FileDragDetector`). When the files come near a notch, it opens on the Shelf page (`NotchChrome.dropPageID`) with two drop zones, Keep on Shelf and AirDrop. The Shelf stores **bookmarks, not copies**, in `~/Library/Application Support/Liova/shelf.json`, so files stay where they are and are followed if moved. Tiles drag back out to any app (`NSItemProvider(contentsOf:)`), and AirDrop uses `NSSharingService(named: .sendViaAirDrop)`.
@@ -134,7 +138,7 @@ Two event-driven sources feed `DownloadsFeature`: published file progress (`Prog
 
 ### Volume and brightness HUDs
 
-Off by default. Two styles: a vertical **side bar** at the right edge of the screen (default; a click-through panel that's ordered out between presses) or **in the notch**. When turned on, a `CGEventTap` that listens only for media-key events (never ordinary typing) applies the change through Core Audio or DisplayServices and shows a 1.5 s critical-priority `system.hud` activity, so it covers everything and then restores what was there. No system process is ever suspended; if the tap fails or macOS keeps disabling it, Liova removes it and the system overlay simply returns. Holding Option at launch (or `LIOVA_SAFE_MODE=1`) starts Liova with HUDs off. Details: [HUD.md](HUD.md).
+Off by default. Three styles: a **side bar** (default: a pill at the edge of the screen that fills with the level, volume on the right and brightness on the left), an **edge light** (a line of light running up that edge, as long as the level), or **in the notch**. The first two share one click-through panel per edge that's ordered out between presses. When turned on, a `CGEventTap` that listens only for media-key events (never ordinary typing) applies the change through Core Audio or DisplayServices and shows a 1.5 s critical-priority `system.hud` activity, so it covers everything and then restores what was there. No system process is ever suspended; if the tap fails or macOS keeps disabling it, Liova removes it and the system overlay simply returns. Holding Option at launch (or `LIOVA_SAFE_MODE=1`) starts Liova with HUDs off. Details: [HUD.md](HUD.md).
 
 ### Agent Island
 

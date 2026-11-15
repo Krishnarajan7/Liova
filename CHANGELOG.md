@@ -10,6 +10,43 @@ released, its section becomes the GitHub release notes.
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-15
+
+### Added
+
+- **Go to your agent's terminal.** With several coding agents running, a session's card in
+  the open notch now has a **Go to it** button, and **Answer in Terminal** takes you there
+  too. In Terminal and iTerm it selects the exact tab (macOS asks once); in VS Code, Cursor,
+  Ghostty and others it brings up the project's window, or the app.
+- **Sound page.** Choose where your Mac's sound goes and which microphone it uses, from the
+  open notch: speakers, AirPods, a display, a USB headset. The one in use is marked; click
+  another to switch. Turn it off in Settings → Activities.
+- **Problem reports you can attach.** If Liova crashes or freezes, Settings → About says how
+  many reports are on your Mac and shows them in Finder, ready to attach to an issue. They
+  stay on your Mac: Liova still sends nothing anywhere.
+
+### Changed
+
+- **A new volume and brightness bar.** The bar at the edge of the screen is now one smaller
+  pill that fills with the level, in the colours of an old hi-fi meter: green, then amber,
+  then red as the volume goes up (warm amber to daylight for brightness). The symbol inside
+  turns dark as the fill reaches it, the case shows on dark and bright windows alike, and
+  pressing a key at either end gives a small bounce.
+- **Edge light**, a third style for volume and brightness: a line of light that runs up the
+  edge of the screen in the same colours, with the level beside its bright end. Choose it in
+  Settings → HUDs → Style.
+- **Better with VoiceOver.** The closed notch says what's live and can be opened without a
+  pointer. Page icons, the Settings gear, the player's buttons, timers, clipboard and Shelf
+  files are named, the song position is a slider that steps ten seconds, and activity cards
+  are read as one sentence.
+
+### Fixed
+
+- If the Now Playing helper kept failing, music stayed out of the notch until Liova was
+  relaunched. Liova now tries again every ten minutes and recovers by itself.
+- A volume bar, alert or paused song could stay in the notch after its time was up, when
+  your Mac's clock had just been adjusted. It now leaves on time.
+
 ## [1.4.0] - 2026-11-14
 
 ### Added

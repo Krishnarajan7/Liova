@@ -116,6 +116,11 @@ public final class LiovaSettings {
         didSet { store(clipboardHistoryEnabled, .clipboardHistoryEnabled) }
     }
 
+    /// A page in the open notch to choose where sound goes and which microphone is used.
+    public var soundPageEnabled: Bool {
+        didSet { store(soundPageEnabled, .soundPageEnabled) }
+    }
+
     /// Say so in the notch when one app is heating up the Mac or filling its memory.
     public var resourceAlertsEnabled: Bool {
         didSet { store(resourceAlertsEnabled, .resourceAlertsEnabled) }
@@ -154,11 +159,7 @@ public final class LiovaSettings {
     /// The city to show weather for, or nil for the Mac's approximate location.
     public var weatherPlace: WeatherPlace? {
         didSet {
-            if let weatherPlace, let data = try? JSONEncoder().encode(weatherPlace) {
-                store(data, .weatherPlace)
-            } else {
-                defaults.removeObject(forKey: Key.weatherPlace.rawValue)
-            }
+            storeOptional(weatherPlace.flatMap { try? JSONEncoder().encode($0) }, .weatherPlace)
         }
     }
 
@@ -224,6 +225,11 @@ public final class LiovaSettings {
 
     public static let hoverDelayRange: ClosedRange<Double> = 0 ... 1
 
+    /// Goes up each time a preference changes. Observe this to react to any of them, so a
+    /// new setting can't be left out of a hand-kept list. Liova's own bookkeeping (the
+    /// welcome was seen, when updates were last checked) doesn't count.
+    public private(set) var revision = 0
+
     @ObservationIgnored private let defaults: UserDefaults
 
     public init(defaults: UserDefaults = .standard) {
@@ -245,6 +251,7 @@ public final class LiovaSettings {
         resourceAlertsEnabled = defaults.object(forKey: Key.resourceAlertsEnabled.rawValue) as? Bool ?? true
         callControlsEnabled = defaults.object(forKey: Key.callControlsEnabled.rawValue) as? Bool ?? true
         clipboardHistoryEnabled = defaults.object(forKey: Key.clipboardHistoryEnabled.rawValue) as? Bool ?? true
+        soundPageEnabled = defaults.object(forKey: Key.soundPageEnabled.rawValue) as? Bool ?? true
         hotkeysEnabled = defaults.object(forKey: Key.hotkeysEnabled.rawValue) as? Bool ?? true
         customShortcuts = defaults.data(forKey: Key.customShortcuts.rawValue)
             .flatMap { try? JSONDecoder().decode([String: Shortcut].self, from: $0) } ?? [:]
@@ -296,6 +303,7 @@ public final class LiovaSettings {
         case resourceAlertsEnabled
         case callControlsEnabled
         case clipboardHistoryEnabled
+        case soundPageEnabled
         case hotkeysEnabled
         case customShortcuts
         case recordingControlsEnabled
@@ -318,8 +326,12 @@ public final class LiovaSettings {
         case agentsOverMusic
     }
 
+    /// Written by Liova itself, not chosen by the user: no feature needs to recheck for these.
+    private static let bookkeeping: Set<Key> = [.hasSeenWelcome, .lastUpdateCheck, .skippedUpdateVersion]
+
     private func store(_ value: some Any, _ key: Key) {
         defaults.set(value, forKey: key.rawValue)
+        noteChange(key)
     }
 
     private func storeOptional(_ value: (some Any)?, _ key: Key) {
@@ -327,6 +339,13 @@ public final class LiovaSettings {
             defaults.set(value, forKey: key.rawValue)
         } else {
             defaults.removeObject(forKey: key.rawValue)
+        }
+        noteChange(key)
+    }
+
+    private func noteChange(_ key: Key) {
+        if !Self.bookkeeping.contains(key) {
+            revision += 1
         }
     }
 }

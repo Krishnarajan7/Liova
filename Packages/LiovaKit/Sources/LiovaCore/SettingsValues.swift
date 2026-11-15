@@ -15,6 +15,8 @@ public enum HUDStyle: String, CaseIterable, Codable, Sendable {
     case sideBar
     /// Inside the notch.
     case notch
+    /// A line of light along the edge of the screen, as long as the level.
+    case edgeLight
 }
 
 /// When the closed-notch music bars move.

@@ -18,6 +18,10 @@ const faqs: { q: string; a: ReactNode }[] = [
     a: "It's built not to. Liova uses no CPU while there's nothing to show, the music wave rests when paused or in Low Power Mode, and every number we claim is measured and published.",
   },
   {
+    q: "Can I change how it looks and works?",
+    a: "Yes. Volume and brightness can be a pill at the screen's edge, a line of light, or inside the notch. You can switch between speakers, AirPods and microphones from the notch. The notch can be black or glass, open on hover or on click, and show on every display or just one. Every feature has its own switch in Settings, so you keep only what you use.",
+  },
+  {
     q: "Which macOS versions?",
     a: "macOS 14 Sonoma or later, on Apple Silicon and Intel. One universal app.",
   },

@@ -110,6 +110,8 @@ The hooks send Liova only what the notch needs:
 
 **Never sent:** your prompts, the agent's replies or thoughts, file contents, diffs and patch contents, tool output, or anything from subagents except their permission requests. Text that is sent is cut to a fixed length and stripped of control and invisible characters (including bidirectional overrides).
 
+Liova itself also notes **which app the agent runs in**, to take you there (see [Go to the terminal](#go-to-the-terminal)): from the process that reported the event it walks up to the first app with a window, and reads that app's identifier and the agent's terminal device name (`/dev/ttys002`). Nothing else about those processes is read, and none of it is stored or sent.
+
 Everything stays on your Mac. The hooks talk to Liova over a private Unix socket that only your user account can open; nothing goes over the network. See the [security model](PLUGIN-API.md#security-model).
 
 ## Approve and deny
@@ -131,6 +133,17 @@ While a request is shown in the notch, Claude Code waits for that answer before 
 ```
 
 Keep it below the hook's own `timeout` (310 seconds), or Claude Code stops waiting first. The same works for Codex's `PermissionRequest` hook in `~/.codex/hooks.json` (`hook codex --timeout 60`); Codex will ask you to trust the changed hook.
+
+## Go to the terminal
+
+With several agents running, the hard part is finding the right window. In the open notch, a session's card has a **Go to it** button, and **Answer in Terminal** on a permission request takes you there too.
+
+| The agent runs in | What comes to the front |
+| --- | --- |
+| Terminal or iTerm | The exact tab. macOS asks once whether Liova may control that app (Automation); say no and you still get the app. |
+| VS Code, Cursor, Ghostty, Warp, kitty and any other app | The window whose title names the project, if Liova has Accessibility access (it's never asked for just for this); otherwise the app, on the window it had last. |
+
+Liova learns where a session runs from its first event after Liova starts, so a session that was already running shows the button after its next step. An agent that isn't inside an app on this Mac (over ssh, or started by a background service) has nowhere to go, and gets the standard card. iTerm's tab selection follows its scripting dictionary but hasn't been tried on a Mac with iTerm yet; if it picks the wrong tab, please [open an issue](https://github.com/Krishnarajan7/Liova/issues/new/choose).
 
 ## Uninstall
 

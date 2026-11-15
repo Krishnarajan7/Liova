@@ -2,7 +2,20 @@ import Foundation
 import LiovaCore
 @testable import LiovaFeatures
 import LiovaPluginKit
+import LiovaProviders
 import Testing
+
+/// Records where it was asked to go instead of moving windows.
+@MainActor
+private final class FakeFocus: AgentTerminalFocusing {
+    var focused: [(terminal: AgentTerminal, project: String?)] = []
+
+    func focus(_ terminal: AgentTerminal, project: String?) {
+        focused.append((terminal, project))
+    }
+}
+
+private let terminal = AgentTerminal(pid: 100, bundleID: "com.apple.Terminal", tty: "/dev/ttys002")
 
 private func event(_ kind: AgentEventKind, session: String = "s1", detail: String? = nil) -> AgentEvent {
     AgentEvent(agent: "claude-code", sessionID: session, project: "Liova", kind: kind, detail: detail)
@@ -20,12 +33,60 @@ struct AgentIslandTests {
     let engine = ActivityEngine()
     let settings: LiovaSettings
     let feature: AgentIslandFeature
+    private let focus = FakeFocus()
 
     private let scratch = ScratchDefaults()
 
     init() throws {
         settings = LiovaSettings(defaults: scratch.defaults)
-        feature = AgentIslandFeature(engine: engine, settings: settings)
+        feature = AgentIslandFeature(engine: engine, settings: settings, focus: focus)
+    }
+
+    @Test func jumpsToWhereTheSessionRuns() {
+        feature.handle(event(.working)) { terminal }
+        #expect(feature.canJump(toAgent: "claude-code", sessionID: "s1"))
+        feature.jumpToTerminal(agent: "claude-code", sessionID: "s1")
+        #expect(focus.focused.count == 1)
+        #expect(focus.focused.first?.terminal == terminal)
+        #expect(focus.focused.first?.project == "Liova")
+    }
+
+    @Test func looksTheTerminalUpOnceUntilTheSessionRestarts() {
+        var lookups = 0
+        let origin: @MainActor () -> AgentTerminal? = {
+            lookups += 1
+            return terminal
+        }
+        feature.handle(event(.working), origin: origin)
+        feature.handle(event(.toolStarted, detail: "Running npm test"), origin: origin)
+        feature.handle(event(.toolFinished), origin: origin)
+        #expect(lookups == 1)
+        feature.handle(event(.sessionStarted), origin: origin) // resumed, maybe in another window
+        #expect(lookups == 2)
+    }
+
+    @Test func noKnownTerminalMeansNoJump() {
+        feature.handle(event(.working)) { nil }
+        #expect(!feature.canJump(toAgent: "claude-code", sessionID: "s1"))
+        feature.jumpToTerminal(agent: "claude-code", sessionID: "s1")
+        #expect(focus.focused.isEmpty)
+    }
+
+    @Test func anEndedSessionForgetsItsTerminal() {
+        feature.handle(event(.working)) { terminal }
+        feature.handle(event(.sessionEnded))
+        #expect(feature.terminals.isEmpty)
+        #expect(!feature.canJump(toAgent: "claude-code", sessionID: "s1"))
+    }
+
+    @Test func aPromptKnowsItsTerminalEvenBeforeAnyOtherEvent() async throws {
+        let feature = feature
+        let task = Task { await feature.requestPermission(permission()) { terminal } }
+        let prompt = try await waitForPrompt()
+        feature.jumpToTerminal(agent: prompt.agent, sessionID: prompt.sessionID)
+        #expect(focus.focused.first?.project == "Liova")
+        feature.answer(prompt.id, with: .ask)
+        #expect(await task.value == .ask)
     }
 
     /// Waits until a prompt is showing (the request runs in its own task).

@@ -67,6 +67,38 @@ jobs:
             test -s "build/Build/Products/Debug/Liova.app/Contents/Resources/Licenses/$name/LICENSE" \
               || { echo "Missing license for $name"; exit 1; }
           done
+      - name: Package the app for the launch checks
+        # tar keeps the signature and symlinks intact; a plain artifact upload doesn't.
+        run: |
+          make bundle-cli
+          tar -C build/Build/Products/Debug -czf build/Liova-app.tar.gz Liova.app
+      - uses: actions/upload-artifact@v7
+        with:
+          name: app
+          path: build/Liova-app.tar.gz
+          retention-days: 3
+
+  launch:
+    # Liova supports macOS 14 and later but is built and unit-tested on the newest macOS only
+    # (it needs the newest Xcode). This starts that same build on the older versions, where a
+    # start-up crash would otherwise go unseen until someone installs it.
+    name: Launches on ${{ matrix.os }}
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          name: app
+          path: build
+      - name: Start Liova and check it stays up
+        run: |
+          tar -C build -xzf build/Liova-app.tar.gz
+          scripts/ci/launch-check.sh build/Liova.app 20
 
   performance:
     name: Performance budget

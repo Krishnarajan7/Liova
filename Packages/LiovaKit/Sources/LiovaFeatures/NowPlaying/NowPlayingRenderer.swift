@@ -241,11 +241,14 @@ private struct Controls: View {
         // the bottom with the time labels. No wider than the controls.
         ZStack {
             HStack(spacing: 2) {
-                ControlButton(symbol: "backward.fill", size: 14) { feature.previousTrack() }
-                ControlButton(symbol: feature.info?.isPlaying == true ? "pause.fill" : "play.fill", size: 20) {
+                let isPlaying = feature.info?.isPlaying == true
+                ControlButton(symbol: "backward.fill", title: "Previous", size: 14) { feature.previousTrack() }
+                ControlButton(
+                    symbol: isPlaying ? "pause.fill" : "play.fill", title: isPlaying ? "Pause" : "Play", size: 20
+                ) {
                     feature.togglePlayPause()
                 }
-                ControlButton(symbol: "forward.fill", size: 14) { feature.nextTrack() }
+                ControlButton(symbol: "forward.fill", title: "Next", size: 14) { feature.nextTrack() }
             }
             HStack(spacing: 4) {
                 if let lyrics {
@@ -266,6 +269,7 @@ private struct Controls: View {
 
 private struct ControlButton: View {
     let symbol: String
+    let title: String
     let size: CGFloat
     let action: () -> Void
     @State private var isHovered = false
@@ -283,6 +287,7 @@ private struct ControlButton: View {
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
         .animation(.easeOut(duration: 0.12), value: isHovered)
+        .accessibilityLabel(Text(title))
     }
 }
 
@@ -347,6 +352,15 @@ private struct Scrubber: View {
             .foregroundStyle(.white.opacity(0.5))
         }
         .transaction { $0.animation = nil }
+        // A slider to VoiceOver: it says where the song is, and steps ten seconds at a time.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Playback position"))
+        .accessibilityValue(Text("\(NowPlayingPolicy.format(shownElapsed)) of \(NowPlayingPolicy.format(duration))"))
+        .accessibilityAdjustableAction { direction in
+            guard duration > 0 else { return }
+            let step = (direction == .increment ? 10 : -10) / duration
+            feature.seek(toFraction: min(max(fraction + step, 0), 1))
+        }
     }
 }
 

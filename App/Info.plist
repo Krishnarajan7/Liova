@@ -42,7 +42,7 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Liova turns repeat on and off for players that only allow it through their own scripting, like Spotify. It asks the first time you press repeat in the notch, and does nothing else with the player.</string>
+	<string>Liova asks this app for one thing you chose in the notch, such as bringing the terminal tab your coding agent runs in to the front, or turning repeat on in a player like Spotify. It does nothing else with the app.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Liova shows your AirPods and other headphones when they connect, with their battery, and lets you switch noise control. It only reads connected audio devices.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
