@@ -3,7 +3,7 @@
 #
 #   scripts/ci/launch-check.sh build/Build/Products/Debug/Liova.app [seconds]
 #
-# CI runs this on the oldest macOS versions Liova supports, with an app built on the newest:
+# CI runs this on the oldest macOS it has a runner for, with an app built on the newest:
 # the unit tests only ever run where the app was built, so this is what catches a start-up
 # crash that only an older macOS has. Exits 0 when the app is healthy.
 set -euo pipefail

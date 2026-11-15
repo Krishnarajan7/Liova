@@ -82,12 +82,13 @@ jobs:
     # Liova supports macOS 14 and later but is built and unit-tested on the newest macOS only
     # (it needs the newest Xcode). This starts that same build on the older versions, where a
     # start-up crash would otherwise go unseen until someone installs it.
+    # GitHub no longer offers a macOS 14 runner, so 15 is the oldest this can reach.
     name: Launches on ${{ matrix.os }}
     needs: build
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, macos-15]
+        os: [macos-15]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
