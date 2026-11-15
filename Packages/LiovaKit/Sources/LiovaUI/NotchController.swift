@@ -27,9 +27,10 @@ public final class NotchController {
 
     /// A return within this window after closing reopens without the hover delay.
     static let quickReturnWindow: TimeInterval = 0.35
-    /// How long the open content stays mounted after closing (the close animation's length),
-    /// so a reversal mid-close continues smoothly.
-    static let keepContentAfterClose: Duration = .milliseconds(550)
+    /// How long the open content stays mounted after closing, so a reversal mid-close
+    /// continues smoothly. Well past the close animation: taking the open content down costs
+    /// a frame, and that frame must not land while the closed notch is still settling in.
+    static let keepContentAfterClose: Duration = .milliseconds(1200)
 
     private func scheduleUnmount() {
         unmountTask?.cancel()

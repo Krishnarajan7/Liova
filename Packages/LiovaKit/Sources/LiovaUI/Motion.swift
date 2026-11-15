@@ -10,7 +10,7 @@ import SwiftUI
 /// moves, and arrives only once the shape is close to its final size. That way
 /// nothing is ever drawn outside the notch mid-animation.
 public enum Motion {
-    public static let open = Animation.spring(response: 0.42, dampingFraction: 1.0)
+    public static let open = Animation.spring(response: 0.36, dampingFraction: 1.0)
     /// Slightly quicker than open and just shy of critical damping: it settles cleanly without
     /// the slow tail a fully damped spring has at the end of a close.
     public static let close = Animation.spring(response: 0.36, dampingFraction: 0.92)
@@ -37,10 +37,18 @@ public enum Motion {
 
     /// Content leaving: quick, so it's gone before the shape changes much.
     public static let contentOut = Animation.easeOut(duration: 0.1)
-    /// Expanded content arriving, once the opening shape has mostly grown.
-    public static let expandedContentIn = Animation.easeOut(duration: 0.2).delay(0.12)
-    /// Compact content arriving, once a closing shape has mostly shrunk.
-    public static let compactContentIn = Animation.easeOut(duration: 0.18).delay(0.26)
+    /// Expanded content arriving, once the opening shape has mostly grown: it starts with the
+    /// shape about four fifths open and is fully there only as the shape comes to rest, so
+    /// the controls never stand finished on a background that is still growing.
+    public static let expandedContentIn = Animation.easeOut(duration: 0.22).delay(0.18)
+    /// Compact content (the icons beside the camera) arriving only once a closing shape is
+    /// about 95% of the way home, so they appear in a notch that has come to rest.
+    public static let compactContentIn = Animation.easeOut(duration: 0.18).delay(0.28)
+    /// The glass notch's black cover (the size of the closed notch, see `NotchSurface`)
+    /// fading away once the glass has grown out from under it.
+    public static let surfaceOpen = Animation.easeOut(duration: 0.25)
+    /// And coming back while the glass shrinks toward it, so it's black when they meet.
+    public static let surfaceClose = Animation.easeIn(duration: 0.18).delay(0.1)
 
     /// Runs `body` with animations disabled.
     ///

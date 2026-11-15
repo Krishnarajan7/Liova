@@ -5,60 +5,68 @@ import SwiftUI
 /// What the notch is drawn on: black, or glass once open.
 ///
 /// Closed, it's black in both styles: glass around the camera housing would outline the
-/// housing instead of hiding it. Opening, the black fades out as the content arrives and
-/// the glass shows through; closing, it comes back before the shape shrinks.
+/// housing instead of hiding it. In the glass style that black is a cover the size of the
+/// closed notch, and it never grows or shrinks with the open notch: the glass grows out
+/// from under it and shrinks back to it, and the cover only fades. A black shape that
+/// travelled with the glass read as a second animation running ahead of or behind it.
 struct NotchSurface: View {
     let style: NotchStyle
     let isExpanded: Bool
     let shape: NotchShape
+    /// The closed notch (or the peeking one): what stays black in the glass style.
+    let cover: NotchSpec
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             if style == .glass {
                 NotchGlass(shape: shape)
+                NotchShape(topRadius: cover.topRadius, bottomRadius: cover.bottomRadius)
+                    .fill(.black)
+                    .frame(width: cover.shapeWidth, height: cover.height)
+                    .opacity(isExpanded ? 0 : 1)
+                    .animation(isExpanded ? Motion.surfaceOpen : Motion.surfaceClose, value: isExpanded)
+            } else {
+                shape.fill(.black)
             }
-            shape
-                .fill(.black)
-                .opacity(style == .glass && isExpanded ? 0 : 1)
-                .animation(isExpanded ? Motion.expandedContentIn : Motion.contentOut, value: isExpanded)
         }
     }
 }
 
 /// Liquid Glass on macOS 26, a behind-window blur before it.
 ///
-/// Clear glass, as on iPhone: the desktop shows through bright and sharp-edged, bent at the
-/// rim, and the glass responds to the pointer. A light dim keeps white text readable over a
-/// bright desktop, and the camera row fades to black so the glass grows out of the housing
-/// instead of framing it.
+/// On macOS 26 it's the system's clear glass and nothing else, as in Control Center: the
+/// desktop shows through, bent and lit at the rim, and the glass responds to the pointer.
+/// Anything painted over it (a dim, a dark band along the camera row) makes it read as
+/// smoked plastic, and the camera housing sits in clear glass cleanly without one.
+///
+/// The blur before macOS 26 is flatter and brighter, so it keeps a light dim for white
+/// text, and fades to black along the camera row.
 private struct NotchGlass: View {
     let shape: NotchShape
 
     static let dim = Color.black.opacity(0.18)
 
     var body: some View {
-        Group {
-            if #available(macOS 26, *) {
-                Color.clear
-                    .glassEffect(.clear.tint(Self.dim).interactive(), in: shape)
-            } else {
-                BehindWindowBlur()
-                    .overlay(Self.dim)
+        if #available(macOS 26, *) {
+            Color.clear
+                .glassEffect(.clear.interactive(), in: shape)
+        } else {
+            BehindWindowBlur()
+                .overlay(Self.dim)
+                .clipShape(shape)
+                .overlay(alignment: .top) {
+                    LinearGradient(
+                        stops: [
+                            .init(color: .black.opacity(0.9), location: 0),
+                            .init(color: .black.opacity(0.35), location: 0.18),
+                            .init(color: .clear, location: 0.4),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
                     .clipShape(shape)
-            }
-        }
-        .overlay(alignment: .top) {
-            LinearGradient(
-                stops: [
-                    .init(color: .black.opacity(0.9), location: 0),
-                    .init(color: .black.opacity(0.35), location: 0.18),
-                    .init(color: .clear, location: 0.4),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .clipShape(shape)
-            .allowsHitTesting(false)
+                    .allowsHitTesting(false)
+                }
         }
     }
 }

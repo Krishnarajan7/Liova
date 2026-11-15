@@ -10,6 +10,19 @@ released, its section becomes the GitHub release notes.
 
 ## [Unreleased]
 
+### Changed
+
+- **Clearer glass.** On macOS 26 the Glass notch is now the system's clear glass with nothing
+  painted over it, like Control Center: the desktop shows through and the edge catches the
+  light, instead of a dark, smoky panel.
+
+### Fixed
+
+- The notch opens and closes more smoothly. In Glass it grows and shrinks as glass, without
+  a black shape running ahead of it or trailing behind; the controls arrive once the notch
+  has opened; and the icons beside the camera return only when it has closed.
+- A dropped frame just after the notch closed.
+
 ## [1.5.0] - 2026-11-15
 
 ### Added

@@ -21,6 +21,9 @@ struct NotchRootView: View {
             compactDetail: showsDetail,
             contentHeight: model.fittedContentHeight
         )
+        let closedSpec = NotchLayout.spec(
+            for: .closed, geometry: model.geometry, hasActivity: hasActivity, compactDetail: showsDetail
+        )
         let idleVirtual = !model.geometry.hasHardwareNotch && !model.showsIdleVirtualNotch && !hasActivity
         let hidden = model.presentation == .closed && (idleVirtual || model.isCoveredByFullScreen)
 
@@ -28,7 +31,8 @@ struct NotchRootView: View {
             NotchSurface(
                 style: model.style,
                 isExpanded: isExpanded,
-                shape: NotchShape(topRadius: spec.topRadius, bottomRadius: spec.bottomRadius)
+                shape: NotchShape(topRadius: spec.topRadius, bottomRadius: spec.bottomRadius),
+                cover: isExpanded ? closedSpec : spec
             )
             // The closed notch is one thing to VoiceOver: what's live, and a way to open it
             // that doesn't need a pointer.
