@@ -53,6 +53,18 @@ struct GitHubReleaseParsingTests {
         """
     }
 
+    @Test func aFailedCheckSaysWhy() {
+        #expect(ReleaseCheckFailure(status: 403) == .rateLimited)
+        #expect(ReleaseCheckFailure(status: 429) == .rateLimited)
+        #expect(ReleaseCheckFailure(status: 502) == .server(502))
+        #expect(ReleaseCheckFailure.message(for: ReleaseCheckFailure.rateLimited).contains("limiting requests"))
+        #expect(ReleaseCheckFailure.message(for: ReleaseCheckFailure.server(502)).contains("(502)"))
+        #expect(ReleaseCheckFailure.message(for: URLError(.notConnectedToInternet)).hasPrefix("You're offline"))
+        #expect(ReleaseCheckFailure.message(for: URLError(.timedOut)).contains("too long"))
+        // Anything else (a proxy, a blocked host) still names what to look at.
+        #expect(ReleaseCheckFailure.message(for: URLError(.cannotFindHost)).contains("api.github.com"))
+    }
+
     @Test func readsAReleaseAndItsInstaller() throws {
         let releases = try GitHubReleaseClient.parse(Data("[\(json())]".utf8))
         let release = try #require(releases.first)

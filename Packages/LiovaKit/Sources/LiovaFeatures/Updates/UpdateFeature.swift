@@ -183,7 +183,7 @@ public final class UpdateFeature {
                     status = .available(offered)
                 } else {
                     // Automatic checks fail quietly (offline is normal); a manual one says so.
-                    status = isManual ? .failed(nil, message: "Couldn't reach GitHub to check for updates.") : .idle
+                    status = isManual ? .failed(nil, message: ReleaseCheckFailure.message(for: error)) : .idle
                 }
                 Log.feature.notice("Update check failed")
             }

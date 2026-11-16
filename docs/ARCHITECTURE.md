@@ -130,7 +130,7 @@ Dragging files anywhere is recognized without reading them: at mouse-down the dr
 
 ### Downloads
 
-Two event-driven sources feed `DownloadsFeature`: published file progress (`Progress.addSubscriber(forFileURL:)` on `~/Downloads`, used by Safari and others) and growing partial files seen through FSEvents (`.crdownload`, `.part`, Telegram's `_partial` media files). Only names and sizes are read, never contents. A 1 Hz sampler runs only while a download is active. Folder discovery runs off the main thread, because listing another app's container (Telegram, opt-in) can wait on a macOS privacy prompt. Details: [DOWNLOADS.md](DOWNLOADS.md).
+Two event-driven sources feed `DownloadsFeature`: published file progress (`Progress.addSubscriber(forFileURL:)` on `~/Downloads`, used by Safari and others) and growing partial files seen through FSEvents (`.crdownload`, `.part`, Telegram's `_partial` media files). Only names and sizes are read, never a download's contents; the one file opened is the small progress record Telegram keeps beside each download. A 1 Hz sampler runs only while a download is active. Folder discovery runs off the main thread, because listing another app's container (Telegram, opt-in) can wait on a macOS privacy prompt. Details: [DOWNLOADS.md](DOWNLOADS.md).
 
 ### Now Playing
 

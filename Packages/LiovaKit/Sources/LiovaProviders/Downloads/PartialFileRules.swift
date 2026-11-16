@@ -23,6 +23,10 @@ public enum PartialFileRules {
         /// False when the finished file's name is an opaque cache key (Telegram), so the
         /// display name is kept when it finishes.
         public var finalNameIsMeaningful: Bool
+        /// The record the app keeps beside the partial file (Telegram's `_partial.meta`),
+        /// which knows the full size and how much has arrived. Such a download finishes
+        /// when its final file appears: the partial file stays.
+        public var progressRecordPath: String?
 
         public init(
             trackedPath: String,
@@ -30,7 +34,8 @@ public enum PartialFileRules {
             sourceApp: String?,
             finalPath: String?,
             isBundle: Bool = false,
-            finalNameIsMeaningful: Bool = true
+            finalNameIsMeaningful: Bool = true,
+            progressRecordPath: String? = nil
         ) {
             self.trackedPath = trackedPath
             self.displayName = displayName
@@ -38,6 +43,7 @@ public enum PartialFileRules {
             self.finalPath = finalPath
             self.isBundle = isBundle
             self.finalNameIsMeaningful = finalNameIsMeaningful
+            self.progressRecordPath = progressRecordPath
         }
     }
 
@@ -122,7 +128,8 @@ public enum PartialFileRules {
             displayName: "Telegram download",
             sourceApp: "Telegram",
             finalPath: String(path.dropLast(telegramSuffix.count)),
-            finalNameIsMeaningful: false
+            finalNameIsMeaningful: false,
+            progressRecordPath: TelegramPartialMeta.path(forPartial: path)
         )
     }
 

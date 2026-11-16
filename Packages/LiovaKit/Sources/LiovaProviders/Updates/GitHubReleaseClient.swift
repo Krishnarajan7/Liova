@@ -53,6 +53,38 @@ public struct ReleaseInfo: Equatable, Sendable, Identifiable {
     }
 }
 
+/// Why a check for updates didn't work, in words the user can act on.
+public enum ReleaseCheckFailure: Error, Equatable, Sendable {
+    /// GitHub allows 60 unsigned requests an hour from one network address, shared by
+    /// everyone behind it (an office, a campus, a VPN).
+    case rateLimited
+    case server(Int)
+    case unreadable
+
+    init(status: Int) {
+        self = status == 403 || status == 429 ? .rateLimited : .server(status)
+    }
+
+    /// What to tell the user about `error`, whatever threw it.
+    public static func message(for error: any Error) -> String {
+        switch error {
+        case ReleaseCheckFailure.rateLimited:
+            "GitHub is limiting requests from your network right now. Try again in an hour."
+        case let ReleaseCheckFailure.server(status):
+            "GitHub answered with an error (\(status)). Try again later."
+        case ReleaseCheckFailure.unreadable:
+            "GitHub's answer couldn't be read. Try again later."
+        case let error as URLError where [.notConnectedToInternet, .networkConnectionLost, .dataNotAllowed]
+            .contains(error.code):
+            "You're offline. Connect to the internet and try again."
+        case let error as URLError where error.code == .timedOut:
+            "GitHub took too long to answer. Try again in a moment."
+        default:
+            "Couldn't reach GitHub to check for updates. A VPN, proxy or firewall may be blocking api.github.com."
+        }
+    }
+}
+
 public protocol ReleaseFetching: Sendable {
     /// Recent published releases, newest first as the server lists them.
     func releases() async throws -> [ReleaseInfo]
@@ -90,8 +122,13 @@ public struct GitHubReleaseClient: ReleaseFetching {
 
     public func releases() async throws -> [ReleaseInfo] {
         let (data, response) = try await session.data(from: endpoint)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
-        return try Self.parse(data)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard status == 200 else { throw ReleaseCheckFailure(status: status) }
+        do {
+            return try Self.parse(data)
+        } catch {
+            throw ReleaseCheckFailure.unreadable
+        }
     }
 
     // MARK: - Parsing

@@ -17,7 +17,7 @@ public struct DownloadItem: Identifiable, Sendable, Equatable {
     /// The app doing the download, when it can be told, e.g. "Safari" or "Telegram".
     public var sourceApp: String?
     public var bytesCompleted: Int64
-    /// `nil` when the size isn't known (Telegram for macOS, some servers).
+    /// `nil` when the size isn't known (browser partial files, some servers).
     public var totalBytes: Int64?
     /// Smoothed bytes per second.
     public var throughput: Double?

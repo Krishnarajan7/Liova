@@ -31,7 +31,8 @@ public final class UpdateRenderer: ActivityRenderer {
                 .monospacedDigit()
                 .foregroundStyle(.white.opacity(0.85))
                 .lineLimit(1)
-                .fixedSize()
+                // Wider than the ear ("10.0 GB"): shrink to fit, never run off the notch.
+                .minimumScaleFactor(0.6)
         )
     }
 

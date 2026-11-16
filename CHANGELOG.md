@@ -10,6 +10,16 @@ released, its section becomes the GitHub release notes.
 
 ## [Unreleased]
 
+### Added
+
+- **Claude Code's usage limits in the notch.** Claude Code's card can show how much of your
+  5-hour and 7-day limits is used and when they reset, how full the context window is, and
+  the session's cost; a number near its limit turns orange. Turn it on in Settings → Agents.
+  A status line you already have in Claude Code keeps working as before.
+- **World clock.** The Timers page shows the time in up to four cities: whether it's day or
+  night there, whether it's already tomorrow, and how many hours from you. Choose the cities
+  in Settings → Activities; remove them all to hide it.
+
 ### Changed
 
 - **Clearer glass.** On macOS 26 the Glass notch is now the system's clear glass with nothing
@@ -22,6 +32,13 @@ released, its section becomes the GitHub release notes.
   a black shape running ahead of it or trailing behind; the controls arrive once the notch
   has opened; and the icons beside the camera return only when it has closed.
 - A dropped frame just after the notch closed.
+- Text beside the camera no longer runs off the edge of the closed notch: a call or recording
+  past an hour, or a heavy app's "10.0 GB", shrinks to fit.
+- Telegram downloads show the right numbers: a progress bar, the real size and the time left,
+  and a "Downloaded" flash when they finish. Before, a video could show its full size from
+  the first second, and a finished download stayed in the notch for a minute.
+- When a check for updates fails, Settings says why (offline, GitHub limiting your network's
+  requests, or something blocking it), not just that it couldn't reach GitHub.
 
 ## [1.5.0] - 2026-11-15
 

@@ -91,7 +91,8 @@ struct RecordingClock: View {
         )
         .monospacedDigit()
         .lineLimit(1)
-        .fixedSize()
+        // Past an hour the time is wider than the closed notch's ear: shrink to fit.
+        .minimumScaleFactor(0.6)
         .contentTransition(.numericText())
     }
 }

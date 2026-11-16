@@ -73,6 +73,9 @@ public final class MediaRemoteAdapterProvider: NowPlayingProviding {
       open(STDIN, '<', '/dev/null');
       exec { '/usr/bin/perl' } '/usr/bin/perl', @ARGV or POSIX::_exit(127);
     }
+    # A helper that exits at once can signal before $pid is set, and the handler above then
+    # lets it pass: look once more, or this would wait on stdin for a helper long gone.
+    POSIX::_exit($status->($?)) if waitpid($pid, POSIX::WNOHANG()) == $pid;
     while (1) {
       my $read = sysread(STDIN, my $ignored, 512);
       last if defined $read && $read == 0;

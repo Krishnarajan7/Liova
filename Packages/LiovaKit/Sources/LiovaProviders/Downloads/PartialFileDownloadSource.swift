@@ -7,7 +7,8 @@ import Foundation
 /// Event-driven: one FSEvents stream over the watched roots wakes it when something changes.
 /// While at least one partial file is being tracked, a single coalesced 1 Hz timer samples
 /// the sizes of those files only (for speed and stall detection); it stops when none are.
-/// Only names and sizes are read, never contents.
+/// Only names and sizes are read, never a download's contents. The one file opened is the
+/// small record Telegram keeps beside a download (`TelegramPartialMeta`).
 @MainActor
 public final class PartialFileDownloadSource: DownloadSourcing {
     public struct Root: Sendable, Equatable {
@@ -123,6 +124,8 @@ final class PartialFileMonitor: @unchecked Sendable {
     private var timer: (any DispatchSourceTimer)?
     private var tracker: PartialDownloadTracker
     private var lastDelivered: [DownloadItem] = []
+    /// The last progress record read for each tracked path, and the record's stamp then.
+    private var records: [String: (stamp: FileMetadata.Stamp, progress: TelegramPartialProgress)] = [:]
     private var emit: (@Sendable ([DownloadItem]) -> Void)?
 
     init(
@@ -270,11 +273,38 @@ final class PartialFileMonitor: @unchecked Sendable {
         arrivals: [String],
         at date: Date
     ) {
-        if let size = FileMetadata.size(atPath: path, isBundle: classification.isBundle) {
-            tracker.observe(classification, size: size, at: date)
-        } else if tracker.classification(for: path) != nil {
-            tracker.vanished(path: path, finalPath: finalPath(for: classification, arrivals: arrivals), at: date)
+        guard let size = FileMetadata.size(atPath: path, isBundle: classification.isBundle) else {
+            if tracker.classification(for: path) != nil {
+                tracker.vanished(path: path, finalPath: finalPath(for: classification, arrivals: arrivals), at: date)
+            }
+            return
         }
+        guard let recordPath = classification.progressRecordPath else {
+            tracker.observe(classification, size: size, at: date)
+            return
+        }
+        // Telegram: the record says how much has arrived, and the partial file stays when
+        // the download ends, so the final file appearing is what ends it. A finished one
+        // that's only been touched is never tracked.
+        let progress = progress(for: path, recordPath: recordPath)
+        if classification.finalPath.map(FileMetadata.exists) == true || progress?.isComplete == true {
+            tracker.vanished(path: path, finalPath: classification.finalPath, at: date)
+            records[path] = nil
+        } else {
+            tracker.observe(classification, size: progress?.completed ?? size, total: progress?.total, at: date)
+        }
+    }
+
+    /// The progress record for `path`, read again only when the record has changed. A record
+    /// caught mid-write keeps the last good reading.
+    private func progress(for path: String, recordPath: String) -> TelegramPartialProgress? {
+        guard let stamp = FileMetadata.stamp(atPath: recordPath) else { return records[path]?.progress }
+        if let known = records[path], known.stamp == stamp {
+            return known.progress
+        }
+        guard let progress = TelegramPartialMeta.read(atPath: recordPath) else { return records[path]?.progress }
+        records[path] = (stamp, progress)
+        return progress
     }
 
     /// Where the finished file landed: the name without the partial suffix, or, if the app
@@ -293,6 +323,10 @@ final class PartialFileMonitor: @unchecked Sendable {
 
     private func finishPass(at date: Date) {
         tracker.expireStalled(at: date)
+        if !records.isEmpty {
+            let tracked = Set(tracker.trackedPaths)
+            records = records.filter { tracked.contains($0.key) }
+        }
         updateTimer()
         let items = tracker.drain()
         guard items != lastDelivered else { return }
@@ -325,31 +359,5 @@ private final class WeakMonitor: @unchecked Sendable {
 
     init(_ monitor: PartialFileMonitor) {
         self.monitor = monitor
-    }
-}
-
-/// File-system metadata only: sizes and existence. Never opens a file.
-enum FileMetadata {
-    static func size(atPath path: String, isBundle: Bool) -> Int64? {
-        var info = stat()
-        guard lstat(path, &info) == 0 else { return nil }
-        let type = info.st_mode & S_IFMT
-        if type == S_IFREG {
-            return Int64(info.st_size)
-        }
-        guard type == S_IFDIR, isBundle else { return nil }
-        // A Safari `.download` bundle: the sum of the sizes of the files directly inside it.
-        guard let names = try? FileManager.default.contentsOfDirectory(atPath: path) else { return nil }
-        return names.reduce(Int64(0)) { total, name in
-            var child = stat()
-            let childPath = (path as NSString).appendingPathComponent(name)
-            guard lstat(childPath, &child) == 0, child.st_mode & S_IFMT == S_IFREG else { return total }
-            return total + Int64(child.st_size)
-        }
-    }
-
-    static func exists(_ path: String) -> Bool {
-        var info = stat()
-        return lstat(path, &info) == 0
     }
 }

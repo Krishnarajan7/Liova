@@ -4,12 +4,12 @@ Liova shows downloads in progress in the notch: a ring (or the speed) when close
 
 ## What's detected, and how
 
-Liova never opens or reads a file. It uses only **file-system metadata** (paths, names, sizes, whether a file exists) and the **file progress other apps publish** through Foundation. It looks in these folders and nowhere else:
+Liova never opens or reads a download. It uses only **file-system metadata** (paths, names, sizes, whether a file exists) and the **file progress other apps publish** through Foundation. The one file it opens is the small record Telegram keeps beside each of its downloads (see [Telegram](#telegram)). It looks in these folders and nowhere else:
 
 | Folder | What counts |
 | --- | --- |
 | `~/Downloads` (and its subfolders) | Published download progress; partial files that grow |
-| Telegram for macOS: `~/Library/Group Containers/6N38VWS5BX.ru.keepcoder.Telegram/*/account-*/postbox/media/` | Only files named `*_partial` that grow |
+| Telegram for macOS: `~/Library/Group Containers/6N38VWS5BX.ru.keepcoder.Telegram/*/account-*/postbox/media/` | Only files named `*_partial`, and the `*_partial.meta` record beside each |
 
 Two sources run side by side and are merged (`CompositeDownloadSource`):
 
@@ -30,6 +30,14 @@ Two sources run side by side and are merged (`CompositeDownloadSource`):
 
 When both sources see the same download (Safari publishes progress *and* writes a `.download` bundle), the published progress wins and the partial-file copy is hidden, including its finish, so it flashes once.
 
+## Telegram
+
+Telegram for macOS downloads into its own cache, and the partial file's size says little. For a video it fetches the last bytes first, so the file is full-length from the first second; and when a download ends the partial file stays, with the finished file linked to it.
+
+So for Telegram, Liova reads `<name>_partial.meta`, the record Telegram keeps beside each download: a few dozen bytes holding the file's full size and which byte ranges have arrived (`TelegramPartialMeta`). That gives a real progress bar, size and time left. The record holds no part of the file, its name, or who sent it. It's read again only when it changes, and only for downloads being tracked.
+
+A Telegram download finishes when its final file appears (or the record says every byte has arrived). A finished download that Telegram touches later is not tracked again. Telegram downloads are off unless you turn them on in Settings.
+
 ## In the notch
 
 - One `low`-priority activity per download (`system.downloads.<id>`), updated in place. Low is the ambient level, the same as music: timers, agent prompts and HUDs cover it, and it comes back when they end. Between two low activities the newer one shows, so a download that starts while music plays takes the notch until it ends.
@@ -46,9 +54,9 @@ When both sources see the same download (Safari publishes progress *and* writes 
 
 ## Limitations
 
-- **Telegram for macOS has no file name or total size** in its cache, so its downloads show as "Telegram download" with bytes and speed but no progress bar. Telegram's folders are found when the feature starts; a Telegram account added later is picked up the next time it starts. On recent macOS versions, looking inside another app's group container can make macOS ask once whether Liova may access data from other apps; declining just turns off Telegram detection.
+- **Telegram for macOS has no file name** in its cache, so its downloads show as "Telegram download". Telegram's folders are found when the feature starts; a Telegram account added later is picked up the next time it starts. On recent macOS versions, looking inside another app's group container can make macOS ask once whether Liova may access data from other apps; declining just turns off Telegram detection.
 - **Apps that download into private caches can't be seen** (App Store, many game launchers, cloud-sync clients, apps that write to a temporary folder and move the file at the end). Liova only sees what lands in `~/Downloads` or publishes progress there.
-- Partial-file downloads have no total size (the size the server will send isn't in the file system), so they show bytes and speed but no percentage, unless the browser also publishes progress.
+- Browser partial-file downloads have no total size (the size the server will send isn't in the file system), so they show bytes and speed but no percentage, unless the browser also publishes progress.
 - Chrome sometimes names a download `Unconfirmed 123456.crdownload` before it knows the real name; it's shown as "Download" until it finishes.
 - Downloads saved outside `~/Downloads` aren't detected.
 
@@ -59,6 +67,7 @@ When both sources see the same download (Safari publishes progress *and* writes 
 | `DownloadItem`, `DownloadSourcing` | `Sources/LiovaProviders/Downloads/DownloadItem.swift` |
 | Name rules, speed smoothing (pure) | `PartialFileRules.swift` |
 | Partial-file state machine (pure) | `PartialDownloadTracker.swift` |
+| Telegram's progress record (pure parser) | `TelegramPartialMeta.swift` |
 | FSEvents source | `PartialFileDownloadSource.swift` |
 | Published-progress source | `FileProgressDownloadSource.swift` |
 | Merge | `CompositeDownloadSource.swift` |

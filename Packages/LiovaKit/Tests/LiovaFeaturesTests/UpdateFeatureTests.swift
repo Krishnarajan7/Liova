@@ -201,7 +201,7 @@ struct UpdateFeatureTests {
         #expect(updates.status == .idle)
         updates.checkNow()
         await updates.finishWork()
-        #expect(updates.status == .failed(nil, message: "Couldn't reach GitHub to check for updates."))
+        #expect(updates.status == .failed(nil, message: "You're offline. Connect to the internet and try again."))
     }
 
     @Test func anOfferSurvivesAFailedRecheck() async {

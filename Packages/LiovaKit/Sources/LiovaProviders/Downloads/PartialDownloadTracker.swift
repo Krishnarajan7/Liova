@@ -6,7 +6,8 @@ import Foundation
 /// - A partial file becomes a visible download once it has grown, is at least
 ///   `minimumSize`, and was first seen at least `minimumAge` ago. Anything that finishes
 ///   sooner was never shown and is dropped quietly.
-/// - It finishes when the partial file disappears and the final file exists.
+/// - It finishes when the partial file disappears and the final file exists (the caller
+///   reports a Telegram download, whose partial file stays, when its final file appears).
 /// - It fails (quietly) when it disappears without a final file, or stops growing for
 ///   `stallTimeout`.
 public struct PartialDownloadTracker: Sendable {
@@ -35,6 +36,7 @@ public struct PartialDownloadTracker: Sendable {
         let firstSeen: Date
         var lastGrowth: Date
         var size: Int64
+        var total: Int64?
         var hasGrown = false
         var isConfirmed = false
         var estimator: ThroughputEstimator
@@ -61,8 +63,14 @@ public struct PartialDownloadTracker: Sendable {
         entries[path]?.classification
     }
 
-    /// Records the current size of a partial file.
-    public mutating func observe(_ classification: PartialFileRules.Classification, size: Int64, at date: Date) {
+    /// Records how many bytes of a download have arrived (a partial file's size), and its
+    /// full size when something knows it.
+    public mutating func observe(
+        _ classification: PartialFileRules.Classification,
+        size: Int64,
+        total: Int64? = nil,
+        at date: Date
+    ) {
         let path = classification.trackedPath
         guard var entry = entries[path] else {
             var estimator = ThroughputEstimator(timeConstant: configuration.smoothingTimeConstant)
@@ -73,10 +81,12 @@ public struct PartialDownloadTracker: Sendable {
                 firstSeen: date,
                 lastGrowth: date,
                 size: size,
+                total: total,
                 estimator: estimator
             )
             return
         }
+        entry.total = total ?? entry.total
         if size != entry.size {
             // Growth, or a restart (smaller): either way it's alive.
             if size > entry.size {
@@ -96,7 +106,8 @@ public struct PartialDownloadTracker: Sendable {
         entries[path] = entry
     }
 
-    /// The partial file is gone. `finalPath` is where the finished file now exists, if it does.
+    /// The download is over: its partial file is gone, or its final file appeared.
+    /// `finalPath` is where the finished file now exists, if it does.
     public mutating func vanished(path: String, finalPath: String?, at date: Date) {
         guard let entry = entries.removeValue(forKey: path), entry.isConfirmed else { return }
         var item = item(for: entry)
@@ -105,6 +116,7 @@ public struct PartialDownloadTracker: Sendable {
         item.estimatedTimeRemaining = nil
         if let finalPath {
             item.state = .finished
+            item.bytesCompleted = entry.total ?? item.bytesCompleted
             item.finalURL = URL(fileURLWithPath: finalPath)
             if entry.classification.finalNameIsMeaningful {
                 item.displayName = (finalPath as NSString).lastPathComponent
@@ -145,7 +157,9 @@ public struct PartialDownloadTracker: Sendable {
             displayName: entry.classification.displayName,
             sourceApp: entry.classification.sourceApp,
             bytesCompleted: entry.size,
+            totalBytes: entry.total,
             throughput: entry.estimator.displayRate,
+            estimatedTimeRemaining: entry.estimator.timeRemaining(completed: entry.size, total: entry.total),
             startDate: entry.firstSeen,
             lastChangeDate: entry.lastGrowth,
             finalURL: entry.classification.finalPath.map { URL(fileURLWithPath: $0) }

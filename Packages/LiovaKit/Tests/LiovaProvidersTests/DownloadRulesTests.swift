@@ -59,7 +59,7 @@ struct DownloadClassificationTests {
         #expect(result.finalPath == nil)
     }
 
-    @Test func telegramMediaPartialHasNoNameOrSize() throws {
+    @Test func telegramMediaPartialHasNoName() throws {
         let path = "/c/stable/account-1/postbox/media/telegram-cloud-document-2-55_partial"
         let result = try #require(PartialFileRules.classify(path: path, rootKind: .telegramMedia))
         #expect(result.displayName == "Telegram download")

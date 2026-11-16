@@ -27,7 +27,9 @@ public final class CallRenderer: ActivityRenderer {
                 .monospacedDigit()
                 .foregroundStyle(.white.opacity(0.85))
                 .lineLimit(1)
-                .fixedSize()
+                // Past an hour it's "1:02:59", wider than the ear: shrink to fit rather
+                // than run off the notch's edge.
+                .minimumScaleFactor(0.6)
         )
     }
 

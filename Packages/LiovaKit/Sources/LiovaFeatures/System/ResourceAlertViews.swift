@@ -42,7 +42,8 @@ public final class ResourceAlertRenderer: ActivityRenderer {
                 .monospacedDigit()
                 .foregroundStyle(LoadLevel.busy.color)
                 .lineLimit(1)
-                .fixedSize()
+                // Wider than the ear ("10.0 GB"): shrink to fit, never run off the notch.
+                .minimumScaleFactor(0.6)
         )
     }
 
