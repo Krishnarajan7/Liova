@@ -62,10 +62,10 @@ public enum CLIParser {
     /// Source used by `activity start` when `--source` isn't given.
     public static let defaultSource = "cli"
 
-    static let flagOptions: Set<String> = ["json", "help", "version", "dry-run"]
+    static let flagOptions: Set<String> = ["json", "help", "version", "dry-run", "statusline", "off"]
     static let valueOptions: Set<String> = [
         "socket", "timeout", "id", "title", "subtitle", "symbol", "progress", "tint", "priority", "ttl", "source",
-        "clear", "settings",
+        "clear", "settings", "then",
     ]
     static let globalOptions: Set<String> = ["json", "help", "version", "socket", "timeout"]
 

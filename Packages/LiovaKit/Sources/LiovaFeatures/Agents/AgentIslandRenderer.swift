@@ -41,12 +41,15 @@ public final class AgentIslandRenderer: ActivityRenderer {
         if let promptID = AgentIslandPolicy.promptID(from: activity.id) {
             return feature.prompt(promptID).map { AnyView(PermissionCard(prompt: $0, feature: feature)) }
         }
-        // A session Liova can take you to gets a card with a way there; any other keeps
-        // the standard card.
-        guard let session = feature.session(for: activity.id),
-              feature.canJump(toAgent: session.agent, sessionID: session.sessionID)
-        else { return nil }
-        return AnyView(SessionCard(activity: activity, session: session, feature: feature))
+        // A session Liova can take you to, or knows the usage of, gets a card with those;
+        // any other keeps the standard card.
+        guard let session = feature.session(for: activity.id) else { return nil }
+        let canJump = feature.canJump(toAgent: session.agent, sessionID: session.sessionID)
+        let usage = feature.usage[session.agent]
+        guard canJump || usage != nil else { return nil }
+        return AnyView(SessionCard(
+            activity: activity, session: session, feature: feature, canJump: canJump, usage: usage
+        ))
     }
 }
 
@@ -55,6 +58,8 @@ private struct SessionCard: View {
     let activity: Activity
     let session: AgentSession
     let feature: AgentIslandFeature
+    let canJump: Bool
+    let usage: AgentUsage?
     @State private var isHovered = false
 
     var body: some View {
@@ -77,24 +82,59 @@ private struct SessionCard: View {
                         .foregroundStyle(.white.opacity(0.6))
                         .lineLimit(1)
                 }
+                if let usage {
+                    UsageLine(usage: usage)
+                }
             }
             .accessibilityElement(children: .combine)
             Spacer(minLength: 0)
-            Button {
-                feature.jumpToTerminal(agent: session.agent, sessionID: session.sessionID)
-            } label: {
-                Label("Go to it", systemImage: "arrow.up.forward.app.fill")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white.opacity(isHovered ? 1 : 0.85))
-                    .padding(.horizontal, 11)
-                    .frame(height: 26)
-                    .background(.white.opacity(isHovered ? 0.2 : 0.12), in: Capsule())
-                    .contentShape(Capsule())
+            if canJump {
+                jumpButton
             }
-            .buttonStyle(.plain)
-            .onHover { isHovered = $0 }
-            .animation(.easeOut(duration: 0.12), value: isHovered)
-            .help("Bring this session's terminal to the front")
+        }
+    }
+
+    private var jumpButton: some View {
+        Button {
+            feature.jumpToTerminal(agent: session.agent, sessionID: session.sessionID)
+        } label: {
+            Label("Go to it", systemImage: "arrow.up.forward.app.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white.opacity(isHovered ? 1 : 0.85))
+                .padding(.horizontal, 11)
+                .frame(height: 26)
+                .background(.white.opacity(isHovered ? 0.2 : 0.12), in: Capsule())
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .animation(.easeOut(duration: 0.12), value: isHovered)
+        .help("Bring this session's terminal to the front")
+    }
+}
+
+/// The agent's usage under its status: limits, context and cost, the ones near their end
+/// in orange.
+private struct UsageLine: View {
+    let usage: AgentUsage
+
+    var body: some View {
+        // The reset time is on the minute, so once a minute is often enough.
+        TimelineView(.everyMinute) { context in
+            let parts = AgentUsagePolicy.parts(for: usage, now: context.date)
+            HStack(spacing: 5) {
+                ForEach(Array(parts.enumerated()), id: \.offset) { index, part in
+                    if index > 0 {
+                        Text("·").foregroundStyle(.white.opacity(0.3))
+                    }
+                    Text(part.text)
+                        .foregroundStyle(part.isWarning ? Color.orange : .white.opacity(0.5))
+                }
+            }
+            .font(.system(size: 10.5, weight: .medium, design: .rounded))
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
         }
     }
 }

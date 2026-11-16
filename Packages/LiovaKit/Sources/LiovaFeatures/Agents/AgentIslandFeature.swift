@@ -19,6 +19,8 @@ public final class AgentIslandFeature {
     public private(set) var prompts: [AgentPermissionPrompt] = []
     /// The app (and terminal device) each session runs in, by session key, once known.
     public private(set) var terminals: [String: AgentTerminal] = [:]
+    /// The latest usage each agent reported, by agent name.
+    public private(set) var usage: [String: AgentUsage] = [:]
 
     /// Called when a prompt appears (to open the notch) and when the last one is answered.
     @ObservationIgnored public var onAttentionChange: ((Bool) -> Void)?
@@ -75,6 +77,7 @@ public final class AgentIslandFeature {
         }
         sessions.removeAll()
         terminals.removeAll()
+        usage.removeAll()
         engine.endAll(source: AgentIslandPolicy.source)
     }
 
@@ -117,6 +120,13 @@ public final class AgentIslandFeature {
 
     public func handle(_ event: AgentEvent, origin: (@MainActor () -> AgentTerminal?)? = nil) {
         guard isEnabled else { return }
+        if event.kind == .usage {
+            // Numbers only: it says nothing about what the agent is doing.
+            if let usage = event.usage {
+                self.usage[event.agent] = usage
+            }
+            return
+        }
         let key = "\(event.agent).\(event.sessionID)"
         let date = now()
 
@@ -167,7 +177,7 @@ public final class AgentIslandFeature {
             answerElsewhere(sessionKey: key)
             session.state = .finished
             session.detail = nil
-        case .sessionStarted, .sessionEnded:
+        case .sessionStarted, .sessionEnded, .usage:
             break // handled by the caller
         }
     }

@@ -42,6 +42,37 @@ struct AgentIslandTests {
         feature = AgentIslandFeature(engine: engine, settings: settings, focus: focus)
     }
 
+    @Test func usageIsRememberedWithoutTouchingTheNotch() {
+        let usage = AgentUsage(fiveHour: .init(usedPercentage: 23), contextUsedPercentage: 40)
+        feature.handle(AgentEvent(agent: "claude-code", sessionID: "s1", kind: .usage, usage: usage))
+        #expect(feature.usage["claude-code"] == usage)
+        // Numbers alone never put a session in the notch.
+        #expect(feature.sessions.isEmpty)
+        #expect(engine.current == nil)
+        feature.stop()
+        #expect(feature.usage.isEmpty)
+    }
+
+    @Test func usageReadsAsShortPartsAndWarnsNearTheLimit() throws {
+        let now = Date(timeIntervalSince1970: 1_794_724_200)
+        let usage = AgentUsage(
+            fiveHour: .init(usedPercentage: 84.6, resetsAt: now.timeIntervalSince1970 + 3600),
+            sevenDay: .init(usedPercentage: 41.2, resetsAt: nil),
+            contextUsedPercentage: 12,
+            costUSD: 1.234
+        )
+        let parts = try AgentUsagePolicy.parts(
+            for: usage, now: now, timeZone: #require(TimeZone(identifier: "Asia/Kolkata")),
+            locale: Locale(identifier: "en_US")
+        )
+        #expect(parts.map { $0.text.replacingOccurrences(of: "\u{202F}", with: " ") }
+            == ["5h 85%, resets 1:00 PM", "7d 41%", "Context 12%", "$1.23"])
+        #expect(parts.map(\.isWarning) == [true, false, false, false])
+        // A reset time already past, and a cost under a cent, aren't shown.
+        let stale = AgentUsage(fiveHour: .init(usedPercentage: 5, resetsAt: 10), costUSD: 0.001)
+        #expect(AgentUsagePolicy.parts(for: stale, now: now).map(\.text) == ["5h 5%"])
+    }
+
     @Test func jumpsToWhereTheSessionRuns() {
         feature.handle(event(.working)) { terminal }
         #expect(feature.canJump(toAgent: "claude-code", sessionID: "s1"))

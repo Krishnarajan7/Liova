@@ -12,6 +12,7 @@ extension CLIHelp {
       install AGENT     Add Liova's hooks to the agent's settings
       uninstall AGENT   Remove Liova's hooks; everything else is kept
       status [AGENT]    Show whether the hooks are installed and current
+      usage claude-code Show Claude Code's usage limits in the notch
 
     AGENTS
       claude-code       Claude Code (~/.claude/settings.json), with approvals
@@ -75,6 +76,24 @@ extension CLIHelp {
 
     OPTIONS
       --settings PATH   File to check instead of the agent's default (needs AGENT)
+    """
+
+    static let agentsUsage = """
+    USAGE
+      liova agents usage claude-code [--off] [--settings PATH]
+
+    Shows how much of Claude Code's 5-hour and 7-day limits, context window and
+    session cost is used, on the agent's card in the open notch.
+
+    Claude Code hands these numbers only to its status line, so this sets Liova's
+    command as the status line in ~/.claude/settings.json. A status line you already
+    have keeps working exactly as before: Liova runs it and prints its output. If you
+    have none, Liova prints a short one (model, context, limits). The previous file
+    is backed up first. Limits are reported to Claude subscribers only.
+
+    OPTIONS
+      --off               Stop: put your own status line back, or remove Liova's
+      --settings PATH     The settings file to change (default: ~/.claude/settings.json)
     """
 
     static let hook = """

@@ -95,6 +95,17 @@ public struct AgentHookRunner: Sendable {
         }
     }
 
+    /// Runs as Claude Code's status line: reports the usage in `input` to Liova. What to
+    /// print is the caller's business (``ClaudeCodeStatusLine/defaultLine(from:)`` or the
+    /// user's own status line).
+    public func reportUsage(input: Data?) {
+        guard let input, let event = ClaudeCodeStatusLine.usageEvent(from: input) else {
+            log?("No usage in the status line input; nothing to report.")
+            return
+        }
+        send(.agentEvent(event), timeout: eventBudget, label: "usage event")
+    }
+
     func adapt(_ input: Data) -> AgentHookAction {
         agent.adapter(permissionTimeout: permissionTimeout).adapt(input)
     }

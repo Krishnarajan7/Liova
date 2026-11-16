@@ -14,13 +14,68 @@ public struct AgentEvent: Codable, Sendable, Equatable {
     public var kind: AgentEventKind
     /// Short description of the current step, e.g. `Running npm test` or `Editing App.swift`.
     public var detail: String?
+    /// How much of the agent's limits is used. Sent with ``AgentEventKind/usage``.
+    public var usage: AgentUsage?
 
-    public init(agent: String, sessionID: String, project: String? = nil, kind: AgentEventKind, detail: String? = nil) {
+    public init(
+        agent: String,
+        sessionID: String,
+        project: String? = nil,
+        kind: AgentEventKind,
+        detail: String? = nil,
+        usage: AgentUsage? = nil
+    ) {
         self.agent = agent
         self.sessionID = sessionID
         self.project = project
         self.kind = kind
         self.detail = detail
+        self.usage = usage
+    }
+}
+
+/// How much of an agent's limits a session has used, as the agent itself reports it.
+/// Every part is optional: agents report what they know (Claude Code reports rate limits
+/// only to subscribers, and only after the session's first reply).
+public struct AgentUsage: Codable, Sendable, Equatable {
+    /// One rate-limit window.
+    public struct Window: Codable, Sendable, Equatable {
+        /// 0 to 100.
+        public var usedPercentage: Double
+        /// When the window starts over, in seconds since 1970.
+        public var resetsAt: TimeInterval?
+
+        public init(usedPercentage: Double, resetsAt: TimeInterval? = nil) {
+            self.usedPercentage = usedPercentage
+            self.resetsAt = resetsAt
+        }
+    }
+
+    public var fiveHour: Window?
+    public var sevenDay: Window?
+    /// How full the model's context window is, 0 to 100.
+    public var contextUsedPercentage: Double?
+    /// The session's estimated cost in US dollars.
+    public var costUSD: Double?
+    /// The model's display name.
+    public var model: String?
+
+    public init(
+        fiveHour: Window? = nil,
+        sevenDay: Window? = nil,
+        contextUsedPercentage: Double? = nil,
+        costUSD: Double? = nil,
+        model: String? = nil
+    ) {
+        self.fiveHour = fiveHour
+        self.sevenDay = sevenDay
+        self.contextUsedPercentage = contextUsedPercentage
+        self.costUSD = costUSD
+        self.model = model
+    }
+
+    public var isEmpty: Bool {
+        fiveHour == nil && sevenDay == nil && contextUsedPercentage == nil && costUSD == nil
     }
 }
 
@@ -39,6 +94,9 @@ public enum AgentEventKind: String, Codable, Sendable, CaseIterable {
     case finished
     /// The session ended.
     case sessionEnded
+    /// How much of its limits the agent has used (see ``AgentEvent/usage``). Says nothing
+    /// about what the agent is doing.
+    case usage
 }
 
 /// An agent asking whether it may do something.
@@ -92,6 +150,9 @@ public extension LiovaValidation {
         if let detail = event.detail, detail.count > maxDetailLength {
             throw IPCErrorInfo(.badRequest, "'detail' is longer than \(maxDetailLength) characters.")
         }
+        if let usage = event.usage {
+            try validate(usage)
+        }
     }
 
     static func validate(_ request: AgentPermissionRequest) throws(IPCErrorInfo) {
@@ -104,6 +165,20 @@ public extension LiovaValidation {
         }
         guard agentTimeoutRange.contains(request.timeout) else {
             throw IPCErrorInfo(.badRequest, "'timeout' must be between 1 and 3600 seconds.")
+        }
+    }
+
+    private static func validate(_ usage: AgentUsage) throws(IPCErrorInfo) {
+        let percentages = [usage.fiveHour?.usedPercentage, usage.sevenDay?.usedPercentage, usage.contextUsedPercentage]
+        guard percentages.compactMap(\.self).allSatisfy({ (0 ... 100).contains($0) }) else {
+            throw IPCErrorInfo(.badRequest, "Usage percentages must be between 0 and 100.")
+        }
+        let amounts = [usage.costUSD, usage.fiveHour?.resetsAt, usage.sevenDay?.resetsAt]
+        guard amounts.compactMap(\.self).allSatisfy({ $0.isFinite && $0 >= 0 }) else {
+            throw IPCErrorInfo(.badRequest, "Usage amounts must be finite and not negative.")
+        }
+        if let model = usage.model, model.count > maxAgentNameLength {
+            throw IPCErrorInfo(.badRequest, "'model' is longer than \(maxAgentNameLength) characters.")
         }
     }
 

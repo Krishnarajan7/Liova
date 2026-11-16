@@ -145,6 +145,32 @@ With several agents running, the hard part is finding the right window. In the o
 
 Liova learns where a session runs from its first event after Liova starts, so a session that was already running shows the button after its next step. An agent that isn't inside an app on this Mac (over ssh, or started by a background service) has nowhere to go, and gets the standard card. iTerm's tab selection follows its scripting dictionary but hasn't been tried on a Mac with iTerm yet; if it picks the wrong tab, please [open an issue](https://github.com/Krishnarajan7/Liova/issues/new/choose).
 
+## Claude Code's usage limits
+
+Claude Code's card in the open notch can show how much you have left:
+
+```
+5h 85%, resets 9:59 PM · 7d 41% · Context 42% · $1.23
+```
+
+That is your 5-hour and 7-day limits, how full the model's context window is, and the session's estimated cost. A number at 80% or more turns orange. Turn it on in **Settings → Agents → Show Claude Code's usage limits**, or:
+
+```sh
+liova agents usage claude-code        # --off to stop
+```
+
+Claude Code hands these numbers only to its [status line](https://code.claude.com/docs/en/statusline), so this makes Liova's command the status line in `~/.claude/settings.json` (the previous file is backed up first):
+
+- **You already have a status line.** It keeps working exactly as before: Liova's command carries yours along, runs it with the same input and prints its output. Turning usage off puts yours back, unchanged.
+- **You have none.** Liova prints a short one (`Opus · 42% context · 5h 85% · 7d 41%`). Note that Claude Code hides some of its own footer hints while any status line is set.
+
+Good to know:
+
+- **Limits are for subscribers.** Claude Code reports the 5-hour and 7-day limits to Claude Pro, Max and Ultra subscribers, from a session's first reply on. With an API key you see context and cost only.
+- **Claude Code only.** Codex, Gemini CLI and Cursor don't report their usage to anything Liova can read.
+- **What's read:** the numbers above, the model's name and the project folder's name. Nothing else in the status line data is used.
+- The numbers are the latest any Claude Code session reported, and update whenever Claude Code refreshes its status line (after each reply).
+
 ## Uninstall
 
 ```sh

@@ -330,8 +330,9 @@ Two requests carry coding-agent activity. Agent-specific hook formats are transl
 | `agent` | string, required | 1 to 64 characters of `A-Z a-z 0-9 . _ -`, e.g. `claude-code`. |
 | `sessionID` | string, required | The agent's session, 1 to 256 characters. Groups events into one session. |
 | `project` | string | Up to 200 characters, usually the working directory's folder name. |
-| `kind` | string, required | `sessionStarted`, `working`, `toolStarted`, `toolFinished`, `waitingForUser`, `finished` or `sessionEnded`. |
+| `kind` | string, required | `sessionStarted`, `working`, `toolStarted`, `toolFinished`, `waitingForUser`, `finished`, `sessionEnded` or `usage`. |
 | `detail` | string | Up to 300 characters describing the current step, e.g. `Editing App.swift`. |
+| `usage` | object | With `kind` `usage`: how much of the agent's limits is used. It changes nothing about what the session is doing. All optional: `fiveHour` and `sevenDay` (each `{"usedPercentage": 0–100, "resetsAt": seconds since 1970}`), `contextUsedPercentage` (0–100), `costUSD`, `model` (up to 64 characters). |
 
 The response is `{"ok":true,"v":1}`.
 

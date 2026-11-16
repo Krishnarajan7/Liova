@@ -11,17 +11,26 @@ public struct AgentHookOptions: Equatable, Sendable {
     /// The hook payload given as an argument instead of on stdin. Only Codex's `notify`
     /// program setting passes it this way.
     public var payload: String?
+    /// Run as Claude Code's status line (`--statusline`): report usage, then print a line.
+    public var statusLine: Bool
+    /// The status line command to run afterwards and print the output of (`--then`,
+    /// Base64): the one the user had before Liova's.
+    public var thenCommand: String?
 
     public init(
         agent: AgentKind,
         permissionTimeout: TimeInterval = 300,
         socketPath: String? = nil,
-        payload: String? = nil
+        payload: String? = nil,
+        statusLine: Bool = false,
+        thenCommand: String? = nil
     ) {
         self.agent = agent
         self.permissionTimeout = permissionTimeout
         self.socketPath = socketPath
         self.payload = payload
+        self.statusLine = statusLine
+        self.thenCommand = thenCommand
     }
 }
 
@@ -31,6 +40,8 @@ public enum AgentsRequest: Equatable, Sendable {
     case uninstall(AgentKind, settingsPath: String?, dryRun: Bool)
     /// Status of one agent, or of every supported agent.
     case status(AgentKind?, settingsPath: String?)
+    /// Show Claude Code's usage limits in the notch (or, with `--off`, stop).
+    case usage(enabled: Bool, settingsPath: String?)
 }
 
 /// Parses `liova hook ...` and `liova agents ...`. Pure, like ``CLIParser``.
@@ -42,6 +53,7 @@ enum AgentCommandParser {
         case install = "agents install"
         case uninstall = "agents uninstall"
         case status = "agents status"
+        case usage = "agents usage"
 
         var displayName: String {
             "liova \(rawValue)"
@@ -49,9 +61,10 @@ enum AgentCommandParser {
 
         var options: Set<String> {
             switch self {
-            case .hook: ["timeout", "socket"]
+            case .hook: ["timeout", "socket", "statusline", "then"]
             case .install, .uninstall: ["settings", "dry-run"]
             case .status: ["settings"]
+            case .usage: ["settings", "off"]
             }
         }
 
@@ -60,6 +73,7 @@ enum AgentCommandParser {
             case .hook: CLIHelp.hook
             case .install: CLIHelp.agentsInstall
             case .uninstall: CLIHelp.agentsUninstall
+            case .usage: CLIHelp.agentsUsage
             case .status: CLIHelp.agentsStatus
             }
         }
@@ -116,11 +130,17 @@ enum AgentCommandParser {
             if let payload, agent != .codex {
                 throw CLIUsageError("Unexpected argument '\(payload)'.", command: command.displayName)
             }
+            let statusLine = options["statusline"] != nil
+            if statusLine, agent != .claudeCode {
+                throw CLIUsageError("--statusline is for claude-code only.", command: command.displayName)
+            }
             return try .hook(AgentHookOptions(
                 agent: agent,
                 permissionTimeout: permissionTimeout(options),
                 socketPath: socketPath(options, command: command),
-                payload: payload
+                payload: payload,
+                statusLine: statusLine,
+                thenCommand: statusLine ? ClaudeCodeStatusLineEditor.decode(options["then"]) : nil
             ))
         }
         return try .agents(agentsRequest(command, agent: agent, options: options))
@@ -150,6 +170,12 @@ enum AgentCommandParser {
                 )
             }
             return .status(agent, settingsPath: settings)
+        case .usage:
+            guard let agent else { throw missingAgent(command) }
+            guard agent == .claudeCode else {
+                throw CLIUsageError("Only claude-code reports its usage.", command: command.displayName)
+            }
+            return .usage(enabled: options["off"] == nil, settingsPath: settings)
         }
     }
 

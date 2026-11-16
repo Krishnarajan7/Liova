@@ -151,3 +151,49 @@ public struct AgentPermissionPrompt: Identifiable, Equatable, Sendable {
     public var summary: String
     public var deadline: Date
 }
+
+/// How an agent's usage reads on its card. Pure, so it's unit-tested.
+public enum AgentUsagePolicy {
+    /// From this share of a limit on, the number is drawn as a warning.
+    public static let warningPercentage: Double = 80
+
+    public struct Part: Equatable, Sendable {
+        public let text: String
+        public let isWarning: Bool
+    }
+
+    /// The parts to show, most pressing first: `5h 23% · resets 4:30 PM`, `7d 41%`,
+    /// `Context 42%`, `$1.20`.
+    public static func parts(
+        for usage: AgentUsage, now: Date, timeZone: TimeZone = .current, locale: Locale = .current
+    ) -> [Part] {
+        var parts: [Part] = []
+        if let window = usage.fiveHour {
+            var text = "5h \(percent(window.usedPercentage))"
+            if let resetsAt = window.resetsAt, resetsAt > now.timeIntervalSince1970 {
+                let time = Date(timeIntervalSince1970: resetsAt).formatted(
+                    Date.FormatStyle(date: .omitted, time: .shortened, locale: locale, timeZone: timeZone)
+                )
+                text += ", resets \(time)"
+            }
+            parts.append(Part(text: text, isWarning: window.usedPercentage >= warningPercentage))
+        }
+        if let window = usage.sevenDay {
+            parts.append(Part(
+                text: "7d \(percent(window.usedPercentage))",
+                isWarning: window.usedPercentage >= warningPercentage
+            ))
+        }
+        if let context = usage.contextUsedPercentage {
+            parts.append(Part(text: "Context \(percent(context))", isWarning: context >= warningPercentage))
+        }
+        if let cost = usage.costUSD, cost >= 0.01 {
+            parts.append(Part(text: String(format: "$%.2f", cost), isWarning: false))
+        }
+        return parts
+    }
+
+    static func percent(_ value: Double) -> String {
+        "\(Int(value.rounded()))%"
+    }
+}

@@ -1,4 +1,5 @@
 import AppKit
+import LiovaIPC
 import Observation
 
 /// Connects coding agents to Agent Island from Settings, using the `liova` CLI bundled in
@@ -31,6 +32,9 @@ final class AgentConnections {
 
     private(set) var statuses: [String: Status] = [:]
     private(set) var busy: Set<String> = []
+    /// Whether Claude Code's status line reports its usage to Liova.
+    private(set) var showsClaudeUsage = false
+    private(set) var usageProblem: String?
 
     /// The bundled CLI, or nil in builds that skipped `make bundle-cli`.
     var helper: URL? {
@@ -43,6 +47,7 @@ final class AgentConnections {
     }
 
     func refresh() {
+        refreshUsage()
         for agent in Self.agents {
             statuses[agent.id] = .checking
             Task { await refresh(agent.id) }
@@ -55,6 +60,23 @@ final class AgentConnections {
 
     func disconnect(_ id: String) {
         Task { await run(["agents", "uninstall", id], for: id) }
+    }
+
+    /// Turns Claude Code's usage in the notch on or off (its status line; see
+    /// `liova agents usage --help`).
+    func setShowsClaudeUsage(_ shown: Bool) {
+        guard let helper else { return }
+        Task {
+            let result = await Self.execute(helper, ["agents", "usage", "claude-code"] + (shown ? [] : ["--off"]))
+            usageProblem = result.status == 0
+                ? nil : result.output.split(separator: "\n").last.map(String.init) ?? "Something went wrong."
+            refreshUsage()
+        }
+    }
+
+    private func refreshUsage() {
+        guard let helper else { return }
+        showsClaudeUsage = (try? ClaudeCodeUsageInstaller(executablePath: helper.path).isInstalled()) ?? false
     }
 
     private func refresh(_ id: String) async {

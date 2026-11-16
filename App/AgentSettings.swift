@@ -52,6 +52,25 @@ struct AgentSettings: View {
                     }
                 }
             }
+            Section {
+                Toggle("Show Claude Code's usage limits", isOn: Binding(
+                    get: { connections.showsClaudeUsage },
+                    set: { connections.setShowsClaudeUsage($0) }
+                ))
+                .disabled(!settings.agentIslandEnabled || connections.helper == nil)
+            } footer: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(
+                        "Adds your 5-hour and 7-day limits, context and session cost to Claude Code's card in "
+                            + "the open notch. Claude Code gives these only to its status line, so Liova becomes "
+                            + "the status line; one you already have keeps working as before. Limits show for "
+                            + "Claude subscribers, from a session's first reply."
+                    )
+                    if let problem = connections.usageProblem {
+                        Text(problem).foregroundStyle(.orange)
+                    }
+                }
+            }
         }
         .formStyle(.grouped)
         .onAppear { connections.refresh() }
