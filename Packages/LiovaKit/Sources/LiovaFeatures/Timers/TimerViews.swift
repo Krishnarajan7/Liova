@@ -1,3 +1,4 @@
+import LiovaCore
 import LiovaPluginKit
 import LiovaUI
 import SwiftUI
@@ -161,13 +162,16 @@ private struct TimerButton: View {
     }
 }
 
-/// The Timers page: presets, a custom length, and the timers already running.
+/// The Timers page: presets, a custom length, the timers already running, and the time
+/// in the cities chosen in Settings.
 public struct TimersPage: View {
     let feature: TimerFeature
+    let settings: LiovaSettings?
     @State private var customMinutes = 15
 
-    public init(feature: TimerFeature) {
+    public init(feature: TimerFeature, settings: LiovaSettings? = nil) {
         self.feature = feature
+        self.settings = settings
     }
 
     public var body: some View {
@@ -213,6 +217,9 @@ public struct TimersPage: View {
                 }
             }
             .animation(Motion.list, value: feature.timers.map(\.id))
+            if let cities = settings?.worldClockCities, !cities.isEmpty {
+                WorldClockStrip(zoneIDs: cities)
+            }
         }
         .padding(.top, 4)
     }

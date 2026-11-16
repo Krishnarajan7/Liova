@@ -7,14 +7,14 @@ extension AppCoordinator {
     func configureChrome() {
         let shelf = shelf
         let timers = timers
+        let settings = settings
         chrome.addPage(NotchChrome.Page(id: ShelfFeature.pageID, symbol: "tray.full.fill", title: "Shelf") {
             AnyView(ShelfPage(feature: shelf))
         })
         chrome.addPage(NotchChrome.Page(id: TimerFeature.pageID, symbol: "timer", title: "Timers") {
-            AnyView(TimersPage(feature: timers))
+            AnyView(TimersPage(feature: timers, settings: settings))
         })
         let calendar = calendar
-        let settings = settings
         chrome.addPage(NotchChrome.Page(
             id: CalendarFeature.pageID, symbol: "calendar", title: "Calendar",
             isAvailable: { settings.calendarEnabled },

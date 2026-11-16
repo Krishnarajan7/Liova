@@ -121,6 +121,14 @@ public final class LiovaSettings {
         didSet { store(soundPageEnabled, .soundPageEnabled) }
     }
 
+    /// Cities whose time shows on the Timers page, as time zone identifiers
+    /// ("Asia/Tokyo"). Empty hides the world clock.
+    public var worldClockCities: [String] {
+        didSet { store(worldClockCities, .worldClockCities) }
+    }
+
+    public static let defaultWorldClockCities = ["America/New_York", "Europe/London", "Asia/Tokyo"]
+
     /// Say so in the notch when one app is heating up the Mac or filling its memory.
     public var resourceAlertsEnabled: Bool {
         didSet { store(resourceAlertsEnabled, .resourceAlertsEnabled) }
@@ -252,6 +260,8 @@ public final class LiovaSettings {
         callControlsEnabled = defaults.object(forKey: Key.callControlsEnabled.rawValue) as? Bool ?? true
         clipboardHistoryEnabled = defaults.object(forKey: Key.clipboardHistoryEnabled.rawValue) as? Bool ?? true
         soundPageEnabled = defaults.object(forKey: Key.soundPageEnabled.rawValue) as? Bool ?? true
+        worldClockCities = defaults.stringArray(forKey: Key.worldClockCities.rawValue)
+            ?? Self.defaultWorldClockCities
         hotkeysEnabled = defaults.object(forKey: Key.hotkeysEnabled.rawValue) as? Bool ?? true
         customShortcuts = defaults.data(forKey: Key.customShortcuts.rawValue)
             .flatMap { try? JSONDecoder().decode([String: Shortcut].self, from: $0) } ?? [:]
@@ -304,6 +314,7 @@ public final class LiovaSettings {
         case callControlsEnabled
         case clipboardHistoryEnabled
         case soundPageEnabled
+        case worldClockCities
         case hotkeysEnabled
         case customShortcuts
         case recordingControlsEnabled
@@ -325,7 +336,10 @@ public final class LiovaSettings {
         case agentOpensNotchForApprovals
         case agentsOverMusic
     }
+}
 
+/// Saving, kept apart from the list of settings above.
+extension LiovaSettings {
     /// Written by Liova itself, not chosen by the user: no feature needs to recheck for these.
     private static let bookkeeping: Set<Key> = [.hasSeenWelcome, .lastUpdateCheck, .skippedUpdateVersion]
 

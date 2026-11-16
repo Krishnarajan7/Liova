@@ -57,6 +57,15 @@ struct LiovaSettingsTests {
         #expect(settings.revision == before)
     }
 
+    @Test func worldClockCitiesStartWithThreeAndCanBeEmptied() {
+        #expect(LiovaSettings(defaults: defaults).worldClockCities == LiovaSettings.defaultWorldClockCities)
+        LiovaSettings(defaults: defaults).worldClockCities = ["Asia/Kolkata"]
+        #expect(LiovaSettings(defaults: defaults).worldClockCities == ["Asia/Kolkata"])
+        // Removing every city hides the world clock, and it stays hidden.
+        LiovaSettings(defaults: defaults).worldClockCities = []
+        #expect(LiovaSettings(defaults: defaults).worldClockCities.isEmpty)
+    }
+
     @Test func notchStyleIsRemembered() {
         LiovaSettings(defaults: defaults).notchStyle = .glass
         #expect(LiovaSettings(defaults: defaults).notchStyle == .glass)

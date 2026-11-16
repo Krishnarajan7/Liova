@@ -203,6 +203,7 @@ private struct ActivitySettings: View {
                         + "Leave button, which needs Accessibility access."
                 )
             }
+            WorldClockSettings(settings: settings)
             Section {
                 Toggle("Sound: choose speakers and microphone", isOn: $settings.soundPageEnabled)
             } footer: {
