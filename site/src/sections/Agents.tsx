@@ -67,7 +67,7 @@ export function Agents() {
             Your agents, <Marker>one glance</Marker> away.
           </>
         }
-        body="See what your coding agent is doing while you work in another window, and answer its questions from the notch. One click takes you to the terminal tab it runs in. Ignore it, and it simply asks in the terminal as usual."
+        body="See what your coding agent is doing while you work in another window, and answer its questions from the notch. One click takes you to the terminal tab it runs in. For Claude Code, the notch can also show how much of your usage limits is left and when they reset. Ignore it, and it simply asks in the terminal as usual."
       />
       <Reveal delay={0.1} className="mx-auto mt-14 max-w-[820px]">
         <Closeup scene={scene} detail={detail} />

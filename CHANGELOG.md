@@ -10,6 +10,8 @@ released, its section becomes the GitHub release notes.
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-19
+
 ### Added
 
 - **Claude Code's usage limits in the notch.** Claude Code's card can show how much of your
